@@ -89,8 +89,20 @@ for _ in range(RUNS):
 IMAGENET_SHAPE = (1, 3, 224, 224)
 
 
-def vgg_to_sequential(vgg, verify=(IMAGENET_SHAPE,)):
-    """Convert VGG to a pure sequential without overwriting forward.
+def torchvision_to_sequential(vgg, verify=(IMAGENET_SHAPE,)):
+    """Convert torchvision model to a pure sequential without overwriting forward.
+
+    Tested on:
+        - `torchvision.models.vgg11` (and with BN)
+        - `torchvision.models.vgg13` (and with BN)
+        - `torchvision.models.vgg16` (and with BN)
+        - `torchvision.models.vgg19` (and with BN)
+        - `torchvision.models.alexnet`
+
+    Note:
+    -----
+    Works, if the model forward pass is
+        x -> features -> avgpool -> flatten -> classifier
 
     Use `torch.nn.Flatten`.
     Verify identical forward pass for ImageNet-shaped inputs.
@@ -147,21 +159,37 @@ def print_in_out_shapes_during_forward(module):
     return module
 
 
+##############################################################################
+
 models = {
     "vgg11": torchvision.models.vgg11,
+    "vgg11_bn": torchvision.models.vgg11_bn,
     "vgg13": torchvision.models.vgg13,
+    "vgg13_bn": torchvision.models.vgg13_bn,
     "vgg16": torchvision.models.vgg16,
+    "vgg16_bn": torchvision.models.vgg16_bn,
     "vgg19": torchvision.models.vgg19,
+    "vgg19_bn": torchvision.models.vgg19_bn,
+    "alexnet": torchvision.models.alexnet,
 }
 
 for name, load_model in models.items():
     print(name)
     model = load_model()
     # model.avgpool = print_in_out_shapes_during_forward(model.avgpool)
-    model_seq = vgg_to_sequential(model)
+    model_seq = torchvision_to_sequential(model)
     print("Successful")
 
+vgg_pool_in = (7, 7)
+vgg_pool_out = (7, 7)
 print(
-    "Replace Adaptive Pool by normal pool for Imagenet:",
-    can_be_implemented_as_non_adaptive((7, 7), (7, 7)),
+    "(VGG) Replace Adaptive Pool by normal pool for Imagenet:",
+    can_be_implemented_as_non_adaptive(vgg_pool_in, vgg_pool_out),
+)
+
+alex_pool_in = (6, 6)
+alex_pool_out = (6, 6)
+print(
+    "(AlexNet) Replace Adaptive Pool by normal pool for Imagenet:",
+    can_be_implemented_as_non_adaptive(alex_pool_in, alex_pool_out),
 )
