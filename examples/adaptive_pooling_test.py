@@ -16,6 +16,7 @@ https://discuss.pytorch.org/t/adaptive-avg-pool2d-vs-avg-pool2d/27011/3
 import random
 
 import torch
+import torchvision.models
 from torch.nn import AdaptiveAvgPool1d, AdaptiveAvgPool2d, AvgPool1d, AvgPool2d
 
 
@@ -83,3 +84,84 @@ for _ in range(RUNS):
     input_size, output_size = random_params()
     implementable = can_be_implemented_as_non_adaptive(input_size, output_size)
     print(f"in: {input_size}, out: {output_size} -> {implementable}")
+
+
+IMAGENET_SHAPE = (1, 3, 224, 224)
+
+
+def vgg_to_sequential(vgg, verify=(IMAGENET_SHAPE,)):
+    """Convert VGG to a pure sequential without overwriting forward.
+
+    Use `torch.nn.Flatten`.
+    Verify identical forward pass for ImageNet-shaped inputs.
+    """
+
+    def convert(vgg):
+        """ Naming conventions from:
+        https://pytorch.org/docs/stable/_modules/torchvision/torchvision.models/vgg.html
+        """
+        features = list(vgg.features.children())
+        avgpool = vgg.avgpool
+        classifier = list(vgg.classifier.children())
+
+        sequential = torch.nn.Sequential()
+        sequential.features = torch.nn.Sequential(*features)
+        sequential.avgpool = avgpool
+
+        sequential.flatten = torch.nn.Flatten()
+        sequential.classifier = torch.nn.Sequential(*classifier)
+        return sequential
+
+    sequential = convert(vgg)
+
+    def verify_forward(model1, model2, shapes):
+        def forward(model, x, seed=None):
+            if seed is not None:
+                torch.manual_seed(seed)
+            return model(x)
+
+        shapes = [] if shapes is None else shapes
+        for shape in shapes:
+            x = torch.rand(shape)
+            seed = 42
+            y1 = forward(model1, x, seed=seed)
+            y2 = forward(model2, x, seed=seed)
+            if not torch.allclose(y1, y2):
+                raise ValueError("Error in conversion: Forward pass not identical.")
+
+    verify_forward(vgg, sequential, shapes=verify)
+
+    return sequential
+
+
+def print_in_out_shapes_during_forward(module):
+    old_forward = module.forward
+
+    def new_forward(x):
+        print(f"({module.__class__.__name__}) Input: {x.shape}")
+        y = old_forward(x)
+        print(f"({module.__class__.__name__}) Output: {y.shape}")
+        return y
+
+    module.forward = new_forward
+    return module
+
+
+models = {
+    "vgg11": torchvision.models.vgg11,
+    "vgg13": torchvision.models.vgg13,
+    "vgg16": torchvision.models.vgg16,
+    "vgg19": torchvision.models.vgg19,
+}
+
+for name, load_model in models.items():
+    print(name)
+    model = load_model()
+    # model.avgpool = print_in_out_shapes_during_forward(model.avgpool)
+    model_seq = vgg_to_sequential(model)
+    print("Successful")
+
+print(
+    "Replace Adaptive Pool by normal pool for Imagenet:",
+    can_be_implemented_as_non_adaptive((7, 7), (7, 7)),
+)
