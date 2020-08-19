@@ -12,7 +12,7 @@ model = extend(Sequential(Flatten(), Linear(784, 10),))
 lossfunc = extend(CrossEntropyLoss())
 
 loss = lossfunc(model(X), y)
-with backpack(BatchDotGrad()):
+with backpack(BatchDotGrad(), debug=True):
     loss.backward()
 
 for name, param in model.named_parameters():
