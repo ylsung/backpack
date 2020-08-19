@@ -32,7 +32,7 @@ class AutogradExtensions(ExtensionsImplementation):
 
     def batch_dot_grad(self):
         batch_grads = self.batch_grad()
-        return self.pairwise_dot(batch_grads)
+        return [self.pairwise_dot(g) for g in batch_grads]
 
     @staticmethod
     def pairwise_dot(grad_batch):

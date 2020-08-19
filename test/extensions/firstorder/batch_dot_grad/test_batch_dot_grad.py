@@ -21,6 +21,10 @@ def test_batch_dot_grad(problem):
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
     """
-    # TODO: Compute and compare pairwise dot products
-    print("This is a dummy")
-    pass
+    problem.set_up()
+
+    backpack_res = BackpackExtensions(problem).batch_dot_grad()
+    autograd_res = AutogradExtensions(problem).batch_dot_grad()
+
+    check_sizes_and_values(autograd_res, backpack_res)
+    problem.tear_down()
