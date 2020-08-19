@@ -21,6 +21,7 @@ from backpack.extensions import (
     KFLR,
     KFRA,
     PCHMP,
+    BatchDotGrad,
     BatchGrad,
     BatchL2Grad,
     DiagGGNExact,
@@ -90,6 +91,19 @@ for name, param in model.named_parameters():
     print(name)
     print(".grad.shape:             ", param.grad.shape)
     print(".batch_l2.shape:         ", param.batch_l2.shape)
+
+
+# %%
+# Dot products of individual gradients
+
+loss = lossfunc(model(X), y)
+with backpack(BatchDotGrad()):
+    loss.backward()
+
+for name, param in model.named_parameters():
+    print(name)
+    print(".grad.shape:             ", param.grad.shape)
+    print(".batch_dot.shape:        ", param.batch_dot.shape)
 
 # %%
 # It's also possible to ask for multiple quantities at once
