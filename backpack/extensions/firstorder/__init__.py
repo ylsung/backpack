@@ -14,14 +14,15 @@ The implemented extensions are
   The variance of the individual gradients
 - :func:`BatchL2Grad <backpack.extensions.BatchL2Grad>`
   The L2 norm of the individual gradients
-
-
+- :func:`BatchDotGrad <backpack.extensions.BatchDotGrad>`
+  Pairwise dot products of individual gradients
 
 """
 
+from .batch_dot_grad import BatchDotGrad
 from .batch_grad import BatchGrad
 from .batch_l2_grad import BatchL2Grad
 from .sum_grad_squared import SumGradSquared
 from .variance import Variance
 
-__all__ = ["BatchL2Grad", "BatchGrad", "SumGradSquared", "Variance"]
+__all__ = ["BatchL2Grad", "BatchGrad", "SumGradSquared", "Variance", "BatchDotGrad"]
