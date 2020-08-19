@@ -36,3 +36,27 @@ example = {
     "id_prefix": "example",
 }
 BATCHDOTGRAD_SETTINGS.append(example)
+
+###############################################################################
+#                         test setting: Linear Layers                         #
+###############################################################################
+
+BATCHDOTGRAD_SETTINGS += [
+    {
+        "input_fn": lambda: torch.rand(4, 10),
+        "module_fn": lambda: torch.nn.Sequential(
+            torch.nn.Linear(10, 5), torch.nn.Sigmoid(), torch.nn.Linear(5, 3)
+        ),
+        "loss_function_fn": lambda: torch.nn.CrossEntropyLoss(reduction="sum"),
+        "target_fn": lambda: classification_targets((4,), 3),
+    },
+]
+
+###############################################################################
+#                         test setting: Convolutional Layers                  #
+###############################################################################
+
+BATCHDOTGRAD_SETTINGS += [
+    # TODO: Implement `BatchDotGrad` for conv layers
+    # TODO: Add more settings with convolutional layers
+]
