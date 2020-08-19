@@ -9,6 +9,7 @@ Available Extensions
 .. autofunction:: backpack.extensions.BatchL2Grad
 .. autofunction:: backpack.extensions.SumGradSquared
 .. autofunction:: backpack.extensions.Variance
+.. autofunction:: backpack.extensions.BatchDotGrad
 
 -----
 
