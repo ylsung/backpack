@@ -1,4 +1,8 @@
+from torch.nn import Linear
+
 from backpack.extensions.backprop_extension import BackpropExtension
+
+from . import linear
 
 
 class BatchDotGrad(BackpropExtension):
@@ -28,6 +32,6 @@ class BatchDotGrad(BackpropExtension):
             savefield="batch_dot",
             fail_mode="WARNING",
             module_exts={
-                # TODO: Implement extensions for parameter layers
+                Linear: linear.BatchDotGradLinear(),
             },
         )
