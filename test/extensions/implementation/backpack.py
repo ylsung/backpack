@@ -17,3 +17,10 @@ class BackpackExtensions(ExtensionsImplementation):
             loss.backward()
             batch_grads = [p.grad_batch for p in self.problem.model.parameters()]
         return batch_grads
+
+    def batch_dot_grad(self):
+        with backpack(new_ext.BatchDotGrad()):
+            _, _, loss = self.problem.forward_pass()
+            loss.backward()
+            batch_dots = [p.batch_dot for p in self.problem.model.parameters()]
+        return batch_dots

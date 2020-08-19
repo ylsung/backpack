@@ -29,3 +29,14 @@ class AutogradExtensions(ExtensionsImplementation):
                 batch_grads[idx][b, :] = g.detach() * factor
 
         return batch_grads
+
+    def batch_dot_grad(self):
+        batch_grads = self.batch_grad()
+        return self.pairwise_dot(batch_grads)
+
+    @staticmethod
+    def pairwise_dot(grad_batch):
+        # flatten all feature dimensions
+        grad_batch_flat = grad_batch.flatten(start_dim=1)
+        # pairwise dot product
+        return torch.einsum("if,jf->ij", grad_batch_flat, grad_batch_flat)

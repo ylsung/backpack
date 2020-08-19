@@ -7,3 +7,7 @@ class ExtensionsImplementation:
     def batch_grad(self):
         """Individual gradients."""
         raise NotImplementedError
+
+    def batch_dot_grad(self):
+        """Individual gradients pairwise dot product."""
+        raise NotImplementedError
