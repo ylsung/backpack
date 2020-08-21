@@ -1,8 +1,26 @@
-from torch.nn import Linear
+from torch.nn import (
+    BatchNorm1d,
+    Conv1d,
+    Conv2d,
+    Conv3d,
+    ConvTranspose1d,
+    ConvTranspose2d,
+    ConvTranspose3d,
+    Linear,
+)
 
 from backpack.extensions.backprop_extension import BackpropExtension
 
-from . import linear
+from . import (
+    batchnorm1d,
+    conv1d,
+    conv2d,
+    conv3d,
+    conv_transpose1d,
+    conv_transpose2d,
+    conv_transpose3d,
+    linear,
+)
 
 
 class BatchDotGrad(BackpropExtension):
@@ -33,5 +51,12 @@ class BatchDotGrad(BackpropExtension):
             fail_mode="WARNING",
             module_exts={
                 Linear: linear.BatchDotGradLinear(),
+                Conv1d: conv1d.BatchDotGradConv1d(),
+                Conv2d: conv2d.BatchDotGradConv2d(),
+                Conv3d: conv3d.BatchDotGradConv3d(),
+                ConvTranspose1d: conv_transpose1d.BatchDotGradConvTranspose1d(),
+                ConvTranspose2d: conv_transpose2d.BatchDotGradConvTranspose2d(),
+                ConvTranspose3d: conv_transpose3d.BatchDotGradConvTranspose3d(),
+                BatchNorm1d: batchnorm1d.BatchDotGradBatchNorm1d(),
             },
         )
