@@ -23,3 +23,7 @@ class ExtensionsImplementation:
     def variance(self):
         """Variance of Individual gradients"""
         raise NotImplementedError
+
+    def batch_grad_transforms(self, transforms):
+        """Individual gradient transformations."""
+        raise NotImplementedError

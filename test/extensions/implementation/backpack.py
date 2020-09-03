@@ -45,3 +45,12 @@ class BackpackExtensions(ExtensionsImplementation):
             loss.backward()
             variances = [p.variance for p in self.problem.model.parameters()]
         return variances
+
+    def batch_grad_transforms(self, transforms):
+        with backpack(new_ext.BatchGradTransforms(transforms)):
+            _, _, loss = self.problem.forward_pass()
+            loss.backward()
+            batch_grad_transforms = [
+                p.grad_batch_transforms for p in self.problem.model.parameters()
+            ]
+        return batch_grad_transforms

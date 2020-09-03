@@ -21,8 +21,16 @@ The implemented extensions are
 
 from .batch_dot_grad import BatchDotGrad
 from .batch_grad import BatchGrad
+from .batch_grad_transforms import BatchGradTransforms
 from .batch_l2_grad import BatchL2Grad
 from .sum_grad_squared import SumGradSquared
 from .variance import Variance
 
-__all__ = ["BatchL2Grad", "BatchGrad", "SumGradSquared", "Variance", "BatchDotGrad"]
+__all__ = [
+    "BatchL2Grad",
+    "BatchGrad",
+    "SumGradSquared",
+    "Variance",
+    "BatchDotGrad",
+    "BatchGradTransforms",
+]
