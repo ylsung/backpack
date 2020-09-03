@@ -23,6 +23,7 @@ from backpack.extensions import (
     PCHMP,
     BatchDotGrad,
     BatchGrad,
+    BatchGradTransforms,
     BatchL2Grad,
     DiagGGNExact,
     DiagGGNMC,
@@ -34,7 +35,10 @@ from backpack.utils.examples import load_one_batch_mnist
 
 X, y = load_one_batch_mnist(batch_size=512)
 
-model = Sequential(Flatten(), Linear(784, 10),)
+model = Sequential(
+    Flatten(),
+    Linear(784, 10),
+)
 lossfunc = CrossEntropyLoss()
 
 model = extend(model)
@@ -104,6 +108,30 @@ for name, param in model.named_parameters():
     print(name)
     print(".grad.shape:             ", param.grad.shape)
     print(".batch_dot.shape:        ", param.batch_dot.shape)
+
+# %%
+# Individual gradient transformations
+
+transforms = {
+    "cubed": lambda x: x ** 3,
+    "third_moment": lambda x: (x ** 3).sum(0),
+}
+
+loss = lossfunc(model(X), y)
+with backpack(BatchGradTransforms(transforms)):
+    loss.backward()
+
+for name, param in model.named_parameters():
+    print(name)
+    print(".grad.shape:                                  ", param.grad.shape)
+    print(
+        ".grad_batch_transforms['cubed'].shape:        ",
+        param.grad_batch_transforms["cubed"].shape,
+    )
+    print(
+        ".grad_batch_transforms['third_moment'].shape: ",
+        param.grad_batch_transforms["third_moment"].shape,
+    )
 
 # %%
 # It's also possible to ask for multiple quantities at once

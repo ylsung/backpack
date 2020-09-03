@@ -10,6 +10,7 @@ Available Extensions
 .. autofunction:: backpack.extensions.SumGradSquared
 .. autofunction:: backpack.extensions.Variance
 .. autofunction:: backpack.extensions.BatchDotGrad
+.. autofunction:: backpack.extensions.BatchGradTransforms
 
 -----
 
