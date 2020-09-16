@@ -74,6 +74,38 @@ class backpack:
         CTX.set_debug(self.old_debug)
 
 
+class backpack_deactivate_io:
+    """Disable input and output storing of extended modules in a forward pass.
+
+    Note:
+        - Do not mix with ``backpack`` context manager.
+        - Must be used as singleton (no multiple instances allowed).
+    """
+
+    num_instances = 0
+    deactivate_io = False
+
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        """Disable input/output storing."""
+        if not backpack_deactivate_io.num_instances == 0:
+            raise RuntimeError("backpack_deactivate_io context must be singleton")
+        backpack_deactivate_io.num_instances += 1
+        backpack_deactivate_io.deactivate_io = True
+
+    def __exit__(self, type, value, traceback):
+        """Enable input/output storing."""
+        backpack_deactivate_io.num_instances -= 1
+        backpack_deactivate_io.deactivate_io = False
+
+
+def is_io_active():
+    """Return whether input and output should be stored."""
+    return not backpack_deactivate_io.deactivate_io
+
+
 def hook_store_io(module, input, output):
     """Saves the input and output as attributes of the module.
 
@@ -82,9 +114,10 @@ def hook_store_io(module, input, output):
         input: List of input tensors
         output: output tensor
     """
-    for i in range(len(input)):
-        setattr(module, "input{}".format(i), input[i])
-    module.output = output
+    if is_io_active():
+        for i in range(len(input)):
+            setattr(module, "input{}".format(i), input[i])
+        module.output = output
 
 
 def hook_store_shapes(module, input, output):
