@@ -27,5 +27,8 @@ class BatchGradTransformsBase(FirstOrderModuleExtension):
     def apply_transforms(self, ext, batch_grad):
         """Apply transformations to individual gradients. Return results as dict."""
         transforms = ext.get_transforms()
+        results = {key: func(batch_grad) for key, func in transforms.items()}
 
-        return {key: func(batch_grad) for key, func in transforms.items()}
+        del batch_grad
+
+        return results
