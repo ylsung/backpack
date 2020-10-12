@@ -10,7 +10,7 @@ on a linear model for MNIST.
 # %%
 # Let's start by loading some dummy data and extending the model
 
-from torch import rand
+from torch import allclose, rand
 from torch.nn import CrossEntropyLoss, Flatten, Linear, Sequential
 
 from backpack import backpack, extend
@@ -242,3 +242,45 @@ for name, param in model.named_parameters():
     print(".ggnmp(vec).shape:       ", param.ggnmp(vec).shape)
     print(".pchmp_clip(vec).shape:  ", param.pchmp_clip(vec).shape)
     print(".pchmp_abs(vec).shape:   ", param.pchmp_abs(vec).shape)
+
+# %%
+# Post extensions hook
+# --------------------
+
+# %%
+# You can specify an action that will be performed right after all BackPACK extensions
+# have been executed on a module. To do so, write a function that accepts a
+# `torch.nn.Module` and performs a side effect, and hand it to the `backpack` context
+# manager as the `post_extensions_hook` argument.
+
+# As an example, let's compute the Hessian trace during and after backpropagation.
+
+
+class TraceOnTheFly:
+    value = 0.0
+    params_visited = set()
+
+    @staticmethod
+    def sum_diag_h(module):
+        """Add the sum of diagonal Hessian elements to the class variable `trace`."""
+        for param in module.parameters():
+            # we might iterate multiple times over parameters, use their id to filter
+            if id(param) not in TraceOnTheFly.params_visited:
+                TraceOnTheFly.value += param.diag_h.sum()
+                TraceOnTheFly.params_visited.add(id(param))
+
+
+loss = lossfunc(model(X), y)
+
+with backpack(
+    DiagHessian(),
+    post_extensions_hook=TraceOnTheFly.sum_diag_h,
+):
+    loss.backward()
+
+tr_after_backward = sum(param.diag_h.sum() for param in model.parameters())
+tr_while_backward = TraceOnTheFly.value
+
+print(f"Tr(H) while backward: {tr_while_backward}")
+print(f"Tr(H) after backward: {tr_after_backward} ")
+print(f"Same?:                {allclose(tr_after_backward, tr_while_backward)}")
