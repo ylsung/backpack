@@ -1,6 +1,6 @@
 from torch import einsum
 from torch.nn import Conv2d, ConvTranspose2d
-from torch.nn.functional import conv2d
+from torch.nn.functional import conv2d, conv3d
 
 from backpack.core.derivatives.basederivatives import BaseParameterDerivatives
 from backpack.utils import conv as convUtils
@@ -107,7 +107,75 @@ class Conv2DDerivatives(BaseParameterDerivatives):
         return self.reshape_like_output(jac_mat, module)
 
     def _weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
-        """Unintuitive, but faster due to convolution."""
+        """Apply output-weight Jacobian."""
+        USE_HIGHER = True
+
+        if USE_HIGHER:
+            return self.__weight_jac_t_mat_prod_higher_conv(
+                module, g_inp, g_out, mat, sum_batch=sum_batch
+            )
+        else:
+            return self.__weight_jac_t_mat_prod_same_conv(
+                module, g_inp, g_out, mat, sum_batch=sum_batch
+            )
+
+    def __weight_jac_t_mat_prod_higher_conv(
+        self, module, g_inp, g_out, mat, sum_batch=True
+    ):
+        """Requires higher-order convolution.
+
+        The algorithm is proposed in:
+            - Rochette, G., Manoel, A., & Tramel, E. W., Efficient per-example
+              gradient computations in convolutional neural networks (2019).
+        """
+        # Get some useful sizes
+        V = mat.shape[0]
+        C_in = module.in_channels
+        C_out = module.out_channels
+        G = module.groups
+        N, _, H_in, W_in = module.input0.size()
+
+        # Reshape to extract groups from the convolutional layer
+        # Channels are seen as an extra spatial dimension with kernel size 1
+        input_conv = module.input0.view(1, N * G, C_in // G, H_in, W_in).repeat(
+            1, V, 1, 1, 1
+        )
+
+        # Compute convolution between input and output; the batchsize is seen
+        # as channels, taking advantage of the `groups` argument
+        mat_conv = eingroup("v,n,c,h,w->vnc,h,w", mat).unsqueeze(1).unsqueeze(2)
+
+        stride = (1, *module.stride)
+        dilation = (1, *module.dilation)
+        padding = (0, *module.padding)
+
+        conv = conv3d(
+            input_conv,
+            mat_conv,
+            groups=V * N * G,
+            stride=dilation,
+            dilation=stride,
+            padding=padding,
+        ).squeeze(0)
+
+        # Because of rounding shapes when using non-default stride or dilation,
+        # convolution result must be truncated to convolution kernel size
+        K_H_axis, K_W_axis = 2, 3
+        K_H, K_W = module.kernel_size
+        conv = conv.narrow(K_H_axis, 0, K_H).narrow(K_W_axis, 0, K_W)
+
+        new_shape = [V, N, C_out, C_in // G, K_H, K_W]
+        weight_grad = conv.view(*new_shape)
+
+        if sum_batch:
+            weight_grad = weight_grad.sum(1)
+
+        return weight_grad
+
+    def __weight_jac_t_mat_prod_same_conv(
+        self, module, g_inp, g_out, mat, sum_batch=True
+    ):
+        """Requires same-order convolution, but uses more memory."""
         V = mat.shape[0]
         N, C_out, _, _ = module.output_shape
         _, C_in, _, _ = module.input0_shape
@@ -136,6 +204,8 @@ class Conv2DDerivatives(BaseParameterDerivatives):
         grad_weight = grad_weight.narrow(K_H_axis, 0, K_H).narrow(K_W_axis, 0, K_W)
 
         eingroup_eq = "vnio,x,y->v,{}o,i,x,y".format("" if sum_batch else "n,")
-        return eingroup(
+        grad_weight = eingroup(
             eingroup_eq, grad_weight, dim={"v": V, "n": N, "i": C_in, "o": C_out}
         )
+
+        return grad_weight
