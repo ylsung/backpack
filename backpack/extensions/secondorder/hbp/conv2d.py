@@ -1,6 +1,6 @@
 from torch import einsum
 
-from backpack.core.derivatives.conv2d import Conv2DDerivatives
+from backpack.core.derivatives.conv import Conv2DDerivatives
 from backpack.extensions.secondorder.hbp.hbp_options import (
     BackpropStrategy,
     ExpectationApproximation,

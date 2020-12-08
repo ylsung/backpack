@@ -1,4 +1,4 @@
-from backpack.core.derivatives.conv2d import Conv2DDerivatives
+from backpack.core.derivatives.conv import Conv2DDerivatives
 from backpack.extensions.firstorder.sum_grad_squared.sgs_base import SGSBase
 
 

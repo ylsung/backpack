@@ -1,4 +1,4 @@
-from backpack.core.derivatives.conv1d import Conv1DDerivatives
+from backpack.core.derivatives.conv import Conv1DDerivatives
 
 from .base import GradBaseModule
 

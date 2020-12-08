@@ -5,26 +5,23 @@ from torch.nn.grad import _grad_input_padding
 from torch.nn.functional import conv1d, conv2d, conv3d
 from torch.nn.functional import conv_transpose1d, conv_transpose2d, conv_transpose3d
 
+from einops import rearrange, repeat, reduce
 from backpack.core.derivatives.basederivatives import BaseParameterDerivatives
 from backpack.utils.conv_transpose import unfold_by_conv_transpose
-from backpack.utils.ein import eingroup
 
 
 class ConvTransposeNDDerivatives(BaseParameterDerivatives):
     def __init__(self, N):
         if N == 1:
             self.module = ConvTranspose1d
-            self.dim_text = "x"
             self.conv_func = conv1d
             self.conv_transpose_func = conv_transpose1d
         elif N == 2:
             self.module = ConvTranspose2d
-            self.dim_text = "x,y"
             self.conv_func = conv2d
             self.conv_transpose_func = conv_transpose2d
         elif N == 3:
             self.module = ConvTranspose3d
-            self.dim_text = "x,y,z"
             self.conv_func = conv3d
             self.conv_transpose_func = conv_transpose3d
         else:
@@ -35,10 +32,10 @@ class ConvTransposeNDDerivatives(BaseParameterDerivatives):
         return True
 
     def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
-        axes = list(range(3, len(module.output_shape) + 1))
         if sum_batch:
-            axes = [1] + axes
-        return mat.sum(axes)
+            return reduce(mat, "v n c_out ... -> v c_out", reduction="sum")
+        else:
+            return reduce(mat, "v n c_out ... -> v n c_out", reduction="sum")
 
     def _bias_jac_mat_prod(self, module, g_inp, g_out, mat):
         # Expand batch dimension
@@ -114,7 +111,7 @@ class ConvTransposeNDDerivatives(BaseParameterDerivatives):
         return jac_t_mat_t_jac.t()
 
     def _jac_mat_prod(self, module, g_inp, g_out, mat):
-        mat_as_conv = eingroup("v,n,c,{0}->vn,c,{0}".format(self.dim_text), mat)
+        mat_as_conv = rearrange(mat, "v n ... -> (v n) ...")
         jmp_as_conv = self.__jac(module, mat_as_conv)
         return self.reshape_like_output(jmp_as_conv, module)
 
@@ -144,7 +141,7 @@ class ConvTransposeNDDerivatives(BaseParameterDerivatives):
         return jac_t_mat
 
     def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
-        mat_as_conv = eingroup("v,n,c,{0}->vn,c,{0}".format(self.dim_text), mat)
+        mat_as_conv = rearrange(mat, "v n ... -> (v n) ...")
         jmp_as_conv = self.__jac_t(module, mat_as_conv)
         return self.reshape_like_input(jmp_as_conv, module)
 

@@ -5,31 +5,17 @@ from torch.nn.grad import _grad_input_padding
 from torch.nn.functional import conv1d, conv2d, conv3d
 from torch.nn.functional import conv_transpose1d, conv_transpose2d, conv_transpose3d
 
+from einops import rearrange, repeat, reduce
 from backpack.core.derivatives.basederivatives import BaseParameterDerivatives
 from backpack.utils import conv as convUtils
-from backpack.utils.ein import eingroup
 
 
 class ConvNDDerivatives(BaseParameterDerivatives):
-    def __init__(self, N):
-        if N == 1:
-            self.module = Conv1d
-            self.dim_text = "x"
-            self.conv_func = conv1d
-            self.conv_transpose_func = conv_transpose1d
-        elif N == 2:
-            self.module = Conv2d
-            self.dim_text = "x,y"
-            self.conv_func = conv2d
-            self.conv_transpose_func = conv_transpose2d
-        elif N == 3:
-            self.module = Conv3d
-            self.dim_text = "x,y,z"
-            self.conv_func = conv3d
-            self.conv_transpose_func = conv_transpose3d
-        else:
-            raise ValueError("{}-dimensional Conv. is not implemented.".format(N))
+    def __init__(self, N, module, conv_func, conv_transpose_func):
         self.conv_dims = N
+        self.module = module
+        self.conv_func = conv_func
+        self.conv_transpose_func = conv_transpose_func
 
     def hessian_is_zero(self):
         return True
@@ -38,8 +24,7 @@ class ConvNDDerivatives(BaseParameterDerivatives):
         return convUtils.unfold_by_conv(module.input0, module)
 
     def _jac_mat_prod(self, module, g_inp, g_out, mat):
-        dims = self.dim_text
-        mat_as_conv = eingroup("v,n,c,{}->vn,c,{}".format(dims, dims), mat)
+        mat_as_conv = rearrange(mat, "v n ... -> (v n) ...")
         jmp_as_conv = self.conv_func(
             mat_as_conv,
             module.weight.data,
@@ -51,8 +36,7 @@ class ConvNDDerivatives(BaseParameterDerivatives):
         return self.reshape_like_output(jmp_as_conv, module)
 
     def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
-        dims = self.dim_text
-        mat_as_conv = eingroup("v,n,c,{}->vn,c,{}".format(dims, dims), mat)
+        mat_as_conv = rearrange(mat, "v n ... -> (v n) ...")
         jmp_as_conv = self.__jac_t(module, mat_as_conv)
         return self.reshape_like_input(jmp_as_conv, module)
 
@@ -86,27 +70,24 @@ class ConvNDDerivatives(BaseParameterDerivatives):
         # Expand batch dimension
         jac_mat = mat.unsqueeze(1)
         # Expand data dimensions
-        for i in range(3, len(module.output_shape) + 1):
+        for i in range(3, len(module.output.shape) + 1):
             jac_mat = jac_mat.unsqueeze(i)
 
-        expand_shape = [-1, module.output_shape[0], -1, *module.output_shape[2:]]
+        expand_shape = [-1, module.output.shape[0], -1, *module.output.shape[2:]]
 
         return jac_mat.expand(*expand_shape)
 
     def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
-        axes = list(range(3, len(module.output_shape) + 1))
         if sum_batch:
-            axes = [1] + axes
-        return mat.sum(axes)
+            return reduce(mat, "v n c_out ... -> v c_out", reduction="sum")
+        else:
+            return reduce(mat, "v n c_out ... -> v n c_out", reduction="sum")
 
     def _weight_jac_mat_prod(self, module, g_inp, g_out, mat):
         if module.groups != 1:
             raise NotImplementedError("Groups greater than 1 are not supported yet")
 
-        dims = self.dim_text
-        dims_joined = dims.replace(",", "")
-
-        jac_mat = eingroup("v,o,i,{}->v,o,i{}".format(dims, dims_joined), mat)
+        jac_mat = rearrange(mat, "v n c_out ... -> v n (c_out ...)")
         X = self.get_unfolded_input(module)
         jac_mat = einsum("nij,vki->vnkj", X, jac_mat)
         return self.reshape_like_output(jac_mat, module)
@@ -116,22 +97,13 @@ class ConvNDDerivatives(BaseParameterDerivatives):
             raise NotImplementedError("Groups greater than 1 are not supported yet")
 
         V = mat.shape[0]
-        N, C_out = module.output_shape[0], module.output_shape[1]
-        C_in = module.input0_shape[1]
-        C_in_axis = 1
-        N_axis = 0
-        dims = self.dim_text
+        N, C_out = module.output.shape[0], module.output.shape[1]
+        C_in = module.input0.shape[1]
 
-        repeat_pattern = [1, C_in] + [1 for _ in range(self.conv_dims)]
-        mat = eingroup("v,n,c,{}->vn,c,{}".format(dims, dims), mat)
-        mat = mat.repeat(*repeat_pattern)
-        mat = eingroup("a,b,{}->ab,{}".format(dims, dims), mat)
-        mat = mat.unsqueeze(C_in_axis)
+        mat = repeat(mat, "v n c_out ... -> v n (repeat_c_in c_out) ...", repeat_c_in=C_in)
+        mat = repeat(mat, "v n c_in_c_out ... -> (v n c_in_c_out) dummy ...", dummy=1)
 
-        repeat_pattern = [1, V] + [1 for _ in range(self.conv_dims)]
-        input = eingroup("n,c,{}->nc,{}".format(dims, dims), module.input0)
-        input = input.unsqueeze(N_axis)
-        input = input.repeat(*repeat_pattern)
+        input = repeat(module.input0, "n c ... -> dummy (repeat n c) ...", dummy=1, repeat=V)
 
         grad_weight = self.conv_func(
             input,
@@ -148,12 +120,19 @@ class ConvNDDerivatives(BaseParameterDerivatives):
             size = module.weight.shape[2 + dim]
             grad_weight = grad_weight.narrow(axis, 0, size)
 
-        sum_dim = "" if sum_batch else "n,"
-        eingroup_eq = "vnio,{}->v,{}o,i,{}".format(dims, sum_dim, dims)
-
-        return eingroup(
-            eingroup_eq, grad_weight, dim={"v": V, "n": N, "i": C_in, "o": C_out}
-        )
+        if sum_batch:
+            return reduce(
+                grad_weight,
+                "(v n C_in C_out) ... -> v C_out C_in ...",
+                reduction="sum",
+                v=V, n=N, C_in=C_in, C_out=C_out,
+            )
+        else:
+            return rearrange(
+                grad_weight,
+                "(v n C_in C_out) ... -> v n C_out C_in ...",
+                v=V, n=N, C_in=C_in, C_out=C_out,
+            )
 
     def ea_jac_t_mat_jac_prod(self, module, g_inp, g_out, mat):
         in_features = int(prod(module.input0.size()[1:]))
@@ -167,3 +146,18 @@ class ConvNDDerivatives(BaseParameterDerivatives):
         jac_t_mat_t_jac = jac_t_mat_t_jac.reshape(in_features, in_features)
 
         return jac_t_mat_t_jac.t()
+
+
+class Conv1DDerivatives(ConvNDDerivatives):
+    def __init__(self):
+        super().__init__(N=1, module=Conv1d, conv_func=conv1d, conv_transpose_func=conv_transpose1d)
+
+
+class Conv2DDerivatives(ConvNDDerivatives):
+    def __init__(self):
+        super().__init__(N=2, module=Conv2d, conv_func=conv2d, conv_transpose_func=conv_transpose2d)
+
+
+class Conv3DDerivatives(ConvNDDerivatives):
+    def __init__(self):
+        super().__init__(N=3, module=Conv3d, conv_func=conv3d, conv_transpose_func=conv_transpose3d)

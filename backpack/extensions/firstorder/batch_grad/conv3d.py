@@ -1,4 +1,4 @@
-from backpack.core.derivatives.conv3d import Conv3DDerivatives
+from backpack.core.derivatives.conv import Conv3DDerivatives
 from backpack.extensions.firstorder.batch_grad.batch_grad_base import BatchGradBase
 
 
