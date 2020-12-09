@@ -5,7 +5,7 @@ from torch.nn.grad import _grad_input_padding
 from torch.nn.functional import conv1d, conv2d, conv3d
 from torch.nn.functional import conv_transpose1d, conv_transpose2d, conv_transpose3d
 
-from einops import rearrange, repeat, reduce
+from einops import rearrange, reduce
 from backpack.core.derivatives.basederivatives import BaseParameterDerivatives
 from backpack.utils.conv_transpose import unfold_by_conv_transpose
 

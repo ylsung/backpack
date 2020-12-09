@@ -100,10 +100,14 @@ class ConvNDDerivatives(BaseParameterDerivatives):
         N, C_out = module.output.shape[0], module.output.shape[1]
         C_in = module.input0.shape[1]
 
-        mat = repeat(mat, "v n c_out ... -> v n (repeat_c_in c_out) ...", repeat_c_in=C_in)
+        mat = repeat(
+            mat, "v n c_out ... -> v n (repeat_c_in c_out) ...", repeat_c_in=C_in
+        )
         mat = repeat(mat, "v n c_in_c_out ... -> (v n c_in_c_out) dummy ...", dummy=1)
 
-        input = repeat(module.input0, "n c ... -> dummy (repeat n c) ...", dummy=1, repeat=V)
+        input = repeat(
+            module.input0, "n c ... -> dummy (repeat n c) ...", dummy=1, repeat=V
+        )
 
         grad_weight = self.conv_func(
             input,
@@ -125,13 +129,19 @@ class ConvNDDerivatives(BaseParameterDerivatives):
                 grad_weight,
                 "(v n C_in C_out) ... -> v C_out C_in ...",
                 reduction="sum",
-                v=V, n=N, C_in=C_in, C_out=C_out,
+                v=V,
+                n=N,
+                C_in=C_in,
+                C_out=C_out,
             )
         else:
             return rearrange(
                 grad_weight,
                 "(v n C_in C_out) ... -> v n C_out C_in ...",
-                v=V, n=N, C_in=C_in, C_out=C_out,
+                v=V,
+                n=N,
+                C_in=C_in,
+                C_out=C_out,
             )
 
     def ea_jac_t_mat_jac_prod(self, module, g_inp, g_out, mat):
@@ -150,14 +160,20 @@ class ConvNDDerivatives(BaseParameterDerivatives):
 
 class Conv1DDerivatives(ConvNDDerivatives):
     def __init__(self):
-        super().__init__(N=1, module=Conv1d, conv_func=conv1d, conv_transpose_func=conv_transpose1d)
+        super().__init__(
+            N=1, module=Conv1d, conv_func=conv1d, conv_transpose_func=conv_transpose1d
+        )
 
 
 class Conv2DDerivatives(ConvNDDerivatives):
     def __init__(self):
-        super().__init__(N=2, module=Conv2d, conv_func=conv2d, conv_transpose_func=conv_transpose2d)
+        super().__init__(
+            N=2, module=Conv2d, conv_func=conv2d, conv_transpose_func=conv_transpose2d
+        )
 
 
 class Conv3DDerivatives(ConvNDDerivatives):
     def __init__(self):
-        super().__init__(N=3, module=Conv3d, conv_func=conv3d, conv_transpose_func=conv_transpose3d)
+        super().__init__(
+            N=3, module=Conv3d, conv_func=conv3d, conv_transpose_func=conv_transpose3d
+        )
