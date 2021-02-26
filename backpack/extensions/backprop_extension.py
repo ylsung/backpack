@@ -2,6 +2,7 @@ import warnings
 
 from torch.nn import Sequential
 
+from backpack.branching import BRANCHING, Branch
 from backpack.utils.hooks import no_op
 
 FAIL_ERROR = "ERROR"
@@ -63,6 +64,10 @@ class BackpropExtension:
 
             if isinstance(module, Sequential):
                 return no_op
+
+            if BRANCHING:
+                if isinstance(module, Branch):
+                    return no_op
 
             if self.__fail_mode is FAIL_ERROR:
                 raise NotImplementedError(

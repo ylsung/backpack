@@ -3,6 +3,7 @@ import inspect
 
 import torch
 
+from backpack.branching import InputToMerge
 from backpack.extensions.backprop_extension import BackpropExtension
 from backpack.utils.hooks import no_op
 
@@ -140,8 +141,15 @@ def hook_store_io(module, input, output):
         output: output tensor
     """
     if disable.should_store_io() and torch.is_grad_enabled():
+
+        # (multiple) inputs are packed in a class ``InputToMerge``
+        if len(input) == 1 and isinstance(input[0], InputToMerge):
+            input = input[0]
+            print(f"Input to merge storing {len(input)} tensors")
+
         for i in range(len(input)):
             setattr(module, "input{}".format(i), input[i])
+
         module.output = output
 
 

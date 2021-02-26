@@ -1,5 +1,7 @@
 import warnings
 
+from backpack.branching import BRANCHING, BackpropedByMerge
+
 
 class ModuleExtension:
     """
@@ -73,7 +75,30 @@ class ModuleExtension:
 
         bpQuantities = self.backpropagate(ext, module, g_inp, g_out, bpQuantities)
 
-        self.__backprop_quantities(ext, inp, out, bpQuantities)
+        if isinstance(bpQuantities, BackpropedByMerge):
+
+            def get_num_inputs(module):
+                num_inputs = 0
+                while True:
+                    try:
+                        getattr(module, f"input{num_inputs}")
+                        num_inputs += 1
+                    except AttributeError:
+                        break
+                return num_inputs
+
+            num_inputs = get_num_inputs(module)
+
+            assert len(bpQuantities) == 1
+            # remove marker from ``BackpropedByMerge`` class
+            bpQuantities = bpQuantities[0]
+
+            for idx in range(num_inputs):
+                inp_idx = getattr(module, f"input{idx}")
+                self.__backprop_quantities(ext, inp_idx, out, bpQuantities)
+
+        else:
+            self.__backprop_quantities(ext, inp, out, bpQuantities)
 
     @staticmethod
     def __backproped_quantities(ext, out):
@@ -81,8 +106,23 @@ class ModuleExtension:
 
     @staticmethod
     def __backprop_quantities(ext, inp, out, bpQuantities):
-
-        setattr(inp, ext.savefield, bpQuantities)
+        if BRANCHING:
+            if hasattr(inp, ext.savefield):
+                old_value = getattr(inp, ext.savefield)
+                if old_value is None:
+                    assert bpQuantities is None
+                elif callable(old_value):
+                    assert callable(bpQuantities)
+                    print(f"Overwriting savefield {ext.savefield}, inp ID: {id(inp)}")
+                    setattr(inp, ext.savefield, bpQuantities)
+                else:
+                    print(f"Adding  to savefield {ext.savefield}, inp ID: {id(inp)}")
+                    setattr(inp, ext.savefield, bpQuantities + old_value)
+            else:
+                print(f"Writing to savefield {ext.savefield}, inp ID: {id(inp)}")
+                setattr(inp, ext.savefield, bpQuantities)
+        else:
+            setattr(inp, ext.savefield, bpQuantities)
 
         is_a_leaf = out.grad_fn is None
         retain_grad_is_on = getattr(out, "retains_grad", False)
