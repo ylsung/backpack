@@ -1,6 +1,6 @@
 import warnings
 
-from backpack.branching import BRANCHING, BackpropedByMerge
+from backpack.branching import BRANCHING, is_branch_point, is_merge_point
 
 
 class ModuleExtension:
@@ -75,26 +75,10 @@ class ModuleExtension:
 
         bpQuantities = self.backpropagate(ext, module, g_inp, g_out, bpQuantities)
 
-        if isinstance(bpQuantities, BackpropedByMerge):
-
-            def get_num_inputs(module):
-                num_inputs = 0
-                while True:
-                    try:
-                        getattr(module, f"input{num_inputs}")
-                        num_inputs += 1
-                    except AttributeError:
-                        break
-                return num_inputs
-
-            num_inputs = get_num_inputs(module)
-
-            assert len(bpQuantities) == 1
-            # remove marker from ``BackpropedByMerge`` class
-            bpQuantities = bpQuantities[0]
-
-            for idx in range(num_inputs):
-                inp_idx = getattr(module, f"input{idx}")
+        if is_merge_point(out):
+            # distribute backproped quantities to all parallel branches
+            for inp_idx in inp:
+                print("Distributing")
                 self.__backprop_quantities(ext, inp_idx, out, bpQuantities)
 
         else:
@@ -106,20 +90,14 @@ class ModuleExtension:
 
     @staticmethod
     def __backprop_quantities(ext, inp, out, bpQuantities):
-        if BRANCHING:
+        if BRANCHING and is_branch_point(inp):
+            # accumulate backpropagated quantities
             if hasattr(inp, ext.savefield):
                 old_value = getattr(inp, ext.savefield)
-                if old_value is None:
-                    assert bpQuantities is None
-                elif callable(old_value):
-                    assert callable(bpQuantities)
-                    print(f"Overwriting savefield {ext.savefield}, inp ID: {id(inp)}")
-                    setattr(inp, ext.savefield, bpQuantities)
-                else:
-                    print(f"Adding  to savefield {ext.savefield}, inp ID: {id(inp)}")
-                    setattr(inp, ext.savefield, bpQuantities + old_value)
+                print(f"Adding  to savefield {ext.savefield}, inp ID: {id(inp)}")
+                setattr(inp, ext.savefield, bpQuantities + old_value)
             else:
-                print(f"Writing to savefield {ext.savefield}, inp ID: {id(inp)}")
+                print(f"Adding  to savefield {ext.savefield}, inp ID: {id(inp)}")
                 setattr(inp, ext.savefield, bpQuantities)
         else:
             setattr(inp, ext.savefield, bpQuantities)
@@ -141,3 +119,11 @@ class ModuleExtension:
     @staticmethod
     def __save(value, extension, module, param):
         setattr(getattr(module, param), extension.savefield, value)
+
+
+class MergeModuleExtension(ModuleExtension):
+    """Handle backpropagation at a merge point."""
+
+    def backpropagate(self, ext, module, grad_inp, grad_out, backproped):
+        print(f"Module {module} backprops: {backproped}")
+        return backproped

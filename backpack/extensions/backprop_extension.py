@@ -2,7 +2,8 @@ import warnings
 
 from torch.nn import Sequential
 
-from backpack.branching import BRANCHING, Branch
+from backpack.branching import BRANCHING, Branch, Merge, Parallel
+from backpack.extensions.module_extension import MergeModuleExtension
 from backpack.utils.hooks import no_op
 
 FAIL_ERROR = "ERROR"
@@ -66,8 +67,10 @@ class BackpropExtension:
                 return no_op
 
             if BRANCHING:
-                if isinstance(module, Branch):
+                if isinstance(module, (Branch, Parallel)):
                     return no_op
+                if isinstance(module, Merge):
+                    return MergeModuleExtension().apply
 
             if self.__fail_mode is FAIL_ERROR:
                 raise NotImplementedError(

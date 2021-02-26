@@ -27,13 +27,12 @@ from torch.nn import (
     ZeroPad2d,
 )
 
-from backpack.branching import ActiveIdentity, Merge
+from backpack.branching import ActiveIdentity
 from backpack.extensions.backprop_extension import BackpropExtension
 from backpack.extensions.secondorder.hbp import LossHessianStrategy
 
 from . import (
     activations,
-    branching,
     conv1d,
     conv2d,
     conv3d,
@@ -95,7 +94,6 @@ class DiagGGN(BackpropExtension):
                 LogSigmoid: activations.DiagGGNLogSigmoid(),
                 ELU: activations.DiagGGNELU(),
                 SELU: activations.DiagGGNSELU(),
-                Merge: branching.DiagGGNMerge(),
                 Identity: identity.DiagGGNIdentity(),
                 ActiveIdentity: identity.DiagGGNIdentity(),
             },
