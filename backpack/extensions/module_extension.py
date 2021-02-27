@@ -62,6 +62,10 @@ class ModuleExtension:
         warnings.warn("Backpropagate has not been overwritten")
 
     def apply(self, ext, module, g_inp, g_out):
+        """
+        Fetch backpropagated quantities from module output, apply backpropagation
+        rule, and attach the result to module input(s).
+        """
         inp = module.input0
         out = module.output
 
@@ -75,36 +79,45 @@ class ModuleExtension:
 
         bpQuantities = self.backpropagate(ext, module, g_inp, g_out, bpQuantities)
 
-        if is_merge_point(out):
-            # distribute backproped quantities to all parallel branches
-            for inp_idx in inp:
-                print("Distributing")
-                self.__backprop_quantities(ext, inp_idx, out, bpQuantities)
+        # input to a merge point is a container of multiple inputs
+        module_inputs = inp if is_merge_point(out) else (inp,)
 
-        else:
-            self.__backprop_quantities(ext, inp, out, bpQuantities)
+        # distribute backproped quantities to all inputs
+        for module_inp in module_inputs:
+            self.__backprop_quantities(ext, module_inp, out, bpQuantities)
 
     @staticmethod
     def __backproped_quantities(ext, out):
+        """Fetch backpropagated quantities attached to the module output."""
         return getattr(out, ext.savefield, None)
 
     @staticmethod
     def __backprop_quantities(ext, inp, out, bpQuantities):
-        if BRANCHING and is_branch_point(inp):
-            # accumulate backpropagated quantities
-            if hasattr(inp, ext.savefield):
-                old_value = getattr(inp, ext.savefield)
-                print(f"Adding  to savefield {ext.savefield}, inp ID: {id(inp)}")
-                setattr(inp, ext.savefield, bpQuantities + old_value)
-            else:
-                print(f"Adding  to savefield {ext.savefield}, inp ID: {id(inp)}")
-                setattr(inp, ext.savefield, bpQuantities)
-        else:
-            setattr(inp, ext.savefield, bpQuantities)
+        """Propagate back additional information by attaching it to the module input.
 
+        When the computation graph has branches, multiple quantities will be
+        backpropagated to the same input. In this case, a rule for how this information
+        should be accumulated must be specified.
+        """
+        attach = bpQuantities
+
+        existing = getattr(inp, ext.savefield, None)
+        should_accumulate = is_branch_point(inp) and existing is not None and BRANCHING
+
+        if should_accumulate:
+            attach = ext.accumulate_backpropagated_quantities(existing, attach)
+
+        setattr(inp, ext.savefield, attach)
+
+        ModuleExtension.__maybe_delete_received_bpQuantities(ext, inp, out)
+
+    @staticmethod
+    def __maybe_delete_received_bpQuantities(ext, inp, out):
+        """Delete additional backprop info attached to a module output if possible."""
         is_a_leaf = out.grad_fn is None
         retain_grad_is_on = getattr(out, "retains_grad", False)
         inp_is_out = id(inp) == id(out)
+
         should_retain_grad = is_a_leaf or retain_grad_is_on or inp_is_out
 
         if not should_retain_grad:
@@ -125,5 +138,4 @@ class MergeModuleExtension(ModuleExtension):
     """Handle backpropagation at a merge point."""
 
     def backpropagate(self, ext, module, grad_inp, grad_out, backproped):
-        print(f"Module {module} backprops: {backproped}")
         return backproped

@@ -92,3 +92,16 @@ class BackpropExtension:
     def apply(self, module, g_inp, g_out):
         module_extension = self.__get_module_extension(module)
         module_extension(self, module, g_inp, g_out)
+
+    def accumulate_backpropagated_quantities(self, existing, other):
+        """Specify how to accumulate info that is backpropagated to the same node.
+
+        Must be implemented by second-order extensions to function on computation
+        graphs with branching.
+
+        For instance, ``DiagGGN`` extensions must sum their quantities, while
+        ``curvmatprod`` extensions must accumulate functions to a sum of functions.
+        """
+        raise NotImplementedError(
+            f"{self}: No accumulation rule for backpropagated info specified"
+        )

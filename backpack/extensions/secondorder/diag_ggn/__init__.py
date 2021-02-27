@@ -99,6 +99,9 @@ class DiagGGN(BackpropExtension):
             },
         )
 
+    def accumulate_backpropagated_quantities(self, existing, other):
+        return existing + other
+
 
 class DiagGGNExact(DiagGGN):
     """
