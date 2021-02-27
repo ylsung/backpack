@@ -1,6 +1,6 @@
 import warnings
 
-from backpack.branching import BRANCHING, is_branch_point, is_merge_point
+from backpack.branching import is_branch_point, is_merge_point
 
 
 class ModuleExtension:
@@ -102,7 +102,7 @@ class ModuleExtension:
         attach = bpQuantities
 
         existing = getattr(inp, ext.savefield, None)
-        should_accumulate = is_branch_point(inp) and existing is not None and BRANCHING
+        should_accumulate = is_branch_point(inp) and existing is not None
 
         if should_accumulate:
             attach = ext.accumulate_backpropagated_quantities(existing, attach)
@@ -135,7 +135,7 @@ class ModuleExtension:
 
 
 class MergeModuleExtension(ModuleExtension):
-    """Handle backpropagation at a merge point."""
+    """Handle backpropagation at a merge point. Passes on backpropagated info."""
 
     def backpropagate(self, ext, module, grad_inp, grad_out, backproped):
         return backproped

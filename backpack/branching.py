@@ -4,9 +4,6 @@ from collections import OrderedDict
 
 import torch
 
-# Enable modifications in BackPACK's backpropagation to handle branching
-BRANCHING = True
-
 # for marking information backpropagated by PyTorch's autograd
 BRANCH_POINT_FIELD = "_backpack_branch_point"
 MERGE_POINT_FIELD = "_backpack_merge_point"
