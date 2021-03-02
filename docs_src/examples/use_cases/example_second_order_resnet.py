@@ -5,7 +5,7 @@ In this example we explain how you can compute second-order information with Bac
 models that exhibit branching in the forward pass, one popular class being ResNets.
 
 To tell BackPACK that your model is branched, you will have to use a built-in module
-class, instead of rewriting the forward pass manually.
+class, instead of writing the forward pass manually.
 
 """
 
@@ -38,9 +38,11 @@ x, y = x.to(DEVICE), y.to(DEVICE)
 # %%
 # To indicate branching, we build a :py:class:`Parallel <backpack.branching.Parallel>`
 # module which feeds its input through all its constituents, then sums up the outputs.
-# Note that, similar to :py:class:`torch.nn.Sequential` being a container for a
-# sequence of modules, :py:class:`Parallel <backpack.branching.Parallel>` is the
-# parallel analogue.
+#
+# .. note::
+#    Similar to :py:class:`torch.nn.Sequential` being a container for a sequence of
+#    modules, :py:class:`Parallel <backpack.branching.Parallel>` is the parallel
+#    container analogue.
 
 
 def make_resnet(C_in=1, C_hid=2, input_dim=(28, 28), output_dim=10):
@@ -74,18 +76,21 @@ def make_resnet(C_in=1, C_hid=2, input_dim=(28, 28), output_dim=10):
 
 # %%
 # Notice how it is important for second-order extensions to leave the forward pass
-# untouched. Another subtlety: It is currently not possible to use PyTorch's built-in
-# identity module :py:class:`torch.nn.Identity` and instead one has to use BackPACK's
-# :py:class:`ActiveIdentity<backpack.branching.ActiveIdentity>`. The reasons for that
-# are technical: :py:class:`torch.nn.Identity` does not create a new operation in the
-# computation graph. This leads to an unexpected order in which the hooks, that
-# backpropagate information for second-order extensions, are executed.
+# untouched.
 #
-# The problem is known to the PyTorch developers, and they will be resolving this issue
-# in future releases. For now, you need to use
-# :py:class:`ActiveIdentity<backpack.branching.ActiveIdentity>`, which acts like
-# PyTorch's identity, but fixes the backward hook execution order by inserting a new
-# node into the graph during a forward pass.
+# .. note:
+#    It is currently not possible to use PyTorch's built-in identity module
+#    :py:class:`torch.nn.Identity` and instead one has to use BackPACK's
+#    :py:class:`ActiveIdentity<backpack.branching.ActiveIdentity>`. The reasons for that
+#    are technical: :py:class:`torch.nn.Identity` does not create a new operation in the
+#    computation graph. This leads to an unexpected order in which the hooks, that
+#    backpropagate information for second-order extensions, are executed.
+#
+#    The problem is known to the PyTorch developers, and they will resolve this issue
+#    in future releases. For now, you need to use
+#    :py:class:`ActiveIdentity<backpack.branching.ActiveIdentity>`, which acts like
+#    PyTorch's identity, but fixes the backward hook execution order by inserting a new
+#    node into the graph during a forward pass.
 #
 # Let's create and extend our ResNet model, as well as a loss function module:
 
@@ -93,7 +98,7 @@ model = extend(make_resnet()).to(DEVICE)
 lossfunc = extend(torch.nn.CrossEntropyLoss(reduction="mean")).to(DEVICE)
 
 # %%
-# We can compute the generalizes Gauss-Newton/Fisher diagonal as follows:
+# We can compute the generalized Gauss-Newton/Fisher diagonal as follows:
 
 
 model.zero_grad()
@@ -115,9 +120,10 @@ for name, p in model.named_parameters():
 backpack_diag_ggn = [p.diag_ggn_exact for p in model.parameters()]
 
 # %%
-# Currently, BackPACK only supports the second-order extensions
-# :py:class:`DiagGGNExact <backpack.extensions.DiagGGNExact>` and
-# :py:class:`DiagGGNMC<backpack.extensions.DiagGGNMC>`.
+# .. note::
+#    Currently, BackPACK only supports branching for the second-order extensions
+#    :py:class:`DiagGGNExact <backpack.extensions.DiagGGNExact>` and
+#    :py:class:`DiagGGNMC<backpack.extensions.DiagGGNMC>`.
 #
 # To check that everything works, let's compute the GGN diagonal with PyTorch (computing
 # one column at a time using GGN-vector products with unit vectors, from which the
