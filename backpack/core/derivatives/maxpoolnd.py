@@ -3,6 +3,11 @@ from torch import zeros
 from torch.nn.functional import max_pool1d, max_pool2d, max_pool3d
 
 from backpack.core.derivatives.basederivatives import BaseDerivatives
+from backpack.core.derivatives.subsampling import (
+    subsample_input,
+    subsampled_input_shape,
+    subsampled_output_shape,
+)
 
 
 class MaxPoolNDDerivatives(BaseDerivatives):
@@ -20,9 +25,11 @@ class MaxPoolNDDerivatives(BaseDerivatives):
             )
 
     # TODO: Do not recompute but get from forward pass of module
-    def get_pooling_idx(self, module):
+    def get_pooling_idx(self, module, subsampling=None):
+        input = subsample_input(module, subsampling=subsampling)
+
         _, pool_idx = self.maxpool(
-            module.input0,
+            input,
             kernel_size=module.kernel_size,
             stride=module.stride,
             padding=module.padding,
@@ -102,45 +109,50 @@ class MaxPoolNDDerivatives(BaseDerivatives):
         pool_idx = self.__pool_idx_for_jac(module, V)
         return mat.gather(N_axis, pool_idx)
 
-    def __pool_idx_for_jac(self, module, V):
+    def __pool_idx_for_jac(self, module, V, subsampling=None):
         """Manipulated pooling indices ready-to-use in jac(t)."""
-        pool_idx = self.get_pooling_idx(module)
+        pool_idx = self.get_pooling_idx(module, subsampling=subsampling)
         pool_idx = rearrange(pool_idx, "n c ... -> n c (...)")
 
         V_axis = 0
 
         return pool_idx.unsqueeze(V_axis).expand(V, -1, -1, -1)
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         mat_as_pool = rearrange(mat, "v n c ... -> v n c (...)")
-        jmp_as_pool = self.__apply_jacobian_t_of(module, mat_as_pool)
-        return self.reshape_like_input(jmp_as_pool, module)
+        jmp_as_pool = self.__apply_jacobian_t_of(
+            module, mat_as_pool, subsampling=subsampling
+        )
+        return self.reshape_like_input(jmp_as_pool, module, subsampling=subsampling)
 
-    def __apply_jacobian_t_of(self, module, mat):
+    def __apply_jacobian_t_of(self, module, mat, subsampling=None):
         V = mat.shape[0]
-        result = self.__zero_for_jac_t(module, V, mat.device)
-        pool_idx = self.__pool_idx_for_jac(module, V)
+        result = self.__zero_for_jac_t(module, V, mat.device, subsampling=subsampling)
+        pool_idx = self.__pool_idx_for_jac(module, V, subsampling=subsampling)
 
         N_axis = 3
         result.scatter_add_(N_axis, pool_idx, mat)
         return result
 
-    def __zero_for_jac_t(self, module, V, device):
+    def __zero_for_jac_t(self, module, V, device, subsampling=None):
+        output_shape = subsampled_output_shape(module, subsampling=subsampling)
+        input_shape = subsampled_input_shape(module, subsampling=subsampling)
+
         if self.N == 1:
-            N, C_out, _ = module.output.shape
-            _, _, L_in = module.input0.size()
+            N, C_out, _ = output_shape
+            _, _, L_in = input_shape
 
             shape = (V, N, C_out, L_in)
 
         elif self.N == 2:
-            N, C_out, _, _ = module.output.shape
-            _, _, H_in, W_in = module.input0.size()
+            N, C_out, _, _ = output_shape
+            _, _, H_in, W_in = input_shape
 
             shape = (V, N, C_out, H_in * W_in)
 
         elif self.N == 3:
-            N, C_out, _, _, _ = module.output.shape
-            _, _, D_in, H_in, W_in = module.input0.size()
+            N, C_out, _, _, _ = output_shape
+            _, _, D_in, H_in, W_in = input_shape
 
             shape = (V, N, C_out, D_in * H_in * W_in)
 

@@ -22,15 +22,20 @@ class AutogradDerivatives(DerivativesImplementation):
 
         return torch.stack(jac_vec_prods)
 
-    def jac_t_vec_prod(self, vec):
-        input, output, _ = self.problem.forward_pass(input_requires_grad=True)
+    def jac_t_vec_prod(self, vec, subsampling=None):
+        """Apply transpose output-input Jacobian to a vector."""
+        input, output, _ = self.problem.forward_pass(
+            input_requires_grad=True, sample_idx=subsampling
+        )
         return transposed_jacobian_vector_product(output, input, vec)[0]
 
-    def jac_t_mat_prod(self, mat):
+    def jac_t_mat_prod(self, mat, subsampling=None):
         V = mat.shape[0]
 
         vecs = [mat[v] for v in range(V)]
-        jac_t_vec_prods = [self.jac_t_vec_prod(vec) for vec in vecs]
+        jac_t_vec_prods = [
+            self.jac_t_vec_prod(vec, subsampling=subsampling) for vec in vecs
+        ]
 
         return torch.stack(jac_t_vec_prods)
 

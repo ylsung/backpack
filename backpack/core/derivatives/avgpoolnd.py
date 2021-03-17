@@ -16,6 +16,7 @@ from torch.nn import (
 )
 
 from backpack.core.derivatives.basederivatives import BaseDerivatives
+from backpack.core.derivatives.subsampling import subsample_input
 
 
 class AvgPoolNDDerivatives(BaseDerivatives):
@@ -116,16 +117,18 @@ class AvgPoolNDDerivatives(BaseDerivatives):
             N, C_out, D_out, H_out, W_out = module.output.shape
             assert jmp_as_pool.shape == (V * N * C_out, 1, D_out, H_out, W_out)
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         self.check_exotic_parameters(module)
 
         mat_as_pool = self.__make_single_channel(mat, module)
-        jmp_as_pool = self.__apply_jacobian_t_of(module, mat_as_pool)
-        self.__check_jmp_in_as_pool(mat, jmp_as_pool, module)
+        jmp_as_pool = self.__apply_jacobian_t_of(
+            module, mat_as_pool, subsampling=subsampling
+        )
+        self.__check_jmp_in_as_pool(mat, jmp_as_pool, module, subsampling=subsampling)
 
-        return self.reshape_like_input(jmp_as_pool, module)
+        return self.reshape_like_input(jmp_as_pool, module, subsampling=subsampling)
 
-    def __apply_jacobian_t_of(self, module, mat):
+    def __apply_jacobian_t_of(self, module, mat, subsampling=None):
         C_for_conv_t = 1
 
         convnd_t = self.convt(
@@ -142,26 +145,28 @@ class AvgPoolNDDerivatives(BaseDerivatives):
         convnd_t.weight.data = avg_kernel
 
         V_N_C_in = mat.size(0)
+        input = subsample_input(module, subsampling=subsampling)
         if self.N == 1:
-            _, _, L_in = module.input0.size()
+            _, _, L_in = input.size()
             output_size = (V_N_C_in, C_for_conv_t, L_in)
         elif self.N == 2:
-            _, _, H_in, W_in = module.input0.size()
+            _, _, H_in, W_in = input.size()
             output_size = (V_N_C_in, C_for_conv_t, H_in, W_in)
         elif self.N == 3:
-            _, _, D_in, H_in, W_in = module.input0.size()
+            _, _, D_in, H_in, W_in = input.size()
             output_size = (V_N_C_in, C_for_conv_t, D_in, H_in, W_in)
 
         return convnd_t(mat, output_size=output_size)
 
-    def __check_jmp_in_as_pool(self, mat, jmp_as_pool, module):
+    def __check_jmp_in_as_pool(self, mat, jmp_as_pool, module, subsampling=None):
         V = mat.size(0)
+        input = subsample_input(module, subsampling=subsampling)
         if self.N == 1:
-            N, C_in, L_in = module.input0.size()
+            N, C_in, L_in = input.size()
             assert jmp_as_pool.shape == (V * N * C_in, 1, L_in)
         elif self.N == 2:
-            N, C_in, H_in, W_in = module.input0.size()
+            N, C_in, H_in, W_in = input.size()
             assert jmp_as_pool.shape == (V * N * C_in, 1, H_in, W_in)
         elif self.N == 3:
-            N, C_in, D_in, H_in, W_in = module.input0.size()
+            N, C_in, D_in, H_in, W_in = input.size()
             assert jmp_as_pool.shape == (V * N * C_in, 1, D_in, H_in, W_in)

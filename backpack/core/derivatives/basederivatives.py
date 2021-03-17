@@ -1,7 +1,13 @@
 """Base classes for more flexible Jacobians and second-order information."""
 import warnings
 
+import torch
+
 from backpack.core.derivatives import shape_check
+from backpack.core.derivatives.subsampling import (
+    subsampled_input_shape,
+    subsampled_output_shape,
+)
 
 
 class BaseDerivatives:
@@ -71,7 +77,7 @@ class BaseDerivatives:
 
     @shape_check.jac_t_mat_prod_accept_vectors
     @shape_check.jac_t_mat_prod_check_shapes
-    def jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         """Apply transposed input-ouput Jacobian of module output to a matrix.
 
         Implicit application of Jᵀ:
@@ -83,6 +89,8 @@ class BaseDerivatives:
         mat: torch.Tensor
             Matrix the transposed Jacobian will be applied to.
             Must have shape [V, N, C_out, H_out, ...].
+        subsampling: list(int)
+            Indices of samples to be considered. If ``None``, use all samples.
 
         Returns:
         --------
@@ -90,9 +98,9 @@ class BaseDerivatives:
             Transposed Jacobian-matrix product.
             Has shape [V, N, C_in, H_in, ...].
         """
-        return self._jac_t_mat_prod(module, g_inp, g_out, mat)
+        return self._jac_t_mat_prod(module, g_inp, g_out, mat, subsampling=subsampling)
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         """Internal implementation of transposed Jacobian."""
         raise NotImplementedError
 
@@ -163,19 +171,39 @@ class BaseDerivatives:
     def _reshape_like(mat, like):
         """Reshape as like with trailing and additional 0th dimension.
 
-        If like is [N, C, H, ...], returns shape [-1, N, C, H, ...]
+        Args:
+            mat (torch.Tensor): Tensor that will be reshaped.
+            like (torch.Tensor, torch.Size, tuple, list): Tensor or shape
+                that will be used as trailing dimensions in the output.
+
+        Returns:
+            torch.Tensor: Reshape of ``mat`` with trailing dimensions identical
+                to ``like``. For example, if ``like`` is ``[N, C, H, ...]``, and
+                ``mat`` has shape ``[V * N * C * H * ...]``, the result has shape
+                ``[V, N, C, H, ...]``.
         """
         V = -1
-        shape = (V, *like.shape)
+
+        if isinstance(like, torch.Tensor):
+            shape = (V, *like.shape)
+        else:
+            shape = (V, *like)
+
         return mat.reshape(shape)
 
     @classmethod
-    def reshape_like_input(cls, mat, module):
-        return cls._reshape_like(mat, module.input0)
+    def reshape_like_input(cls, mat, module, subsampling=None):
+        """Reshape matrix like module input."""
+        input_shape = subsampled_input_shape(module, subsampling=subsampling)
+
+        return cls._reshape_like(mat, input_shape)
 
     @classmethod
-    def reshape_like_output(cls, mat, module):
-        return cls._reshape_like(mat, module.output)
+    def reshape_like_output(cls, mat, module, subsampling=None):
+        """Reshape matrix like module output."""
+        output_shape = subsampled_output_shape(module, subsampling=subsampling)
+
+        return cls._reshape_like(mat, output_shape)
 
 
 class BaseParameterDerivatives(BaseDerivatives):

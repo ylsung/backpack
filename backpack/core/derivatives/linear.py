@@ -18,7 +18,7 @@ class LinearDerivatives(BaseParameterDerivatives):
     def hessian_is_zero(self):
         return True
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         """Apply transposed Jacobian of the output w.r.t. the input."""
         d_input = module.weight.data
         return einsum("oi,vno->vni", (d_input, mat))

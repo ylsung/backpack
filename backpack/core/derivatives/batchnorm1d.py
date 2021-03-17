@@ -15,7 +15,7 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
     def _jac_mat_prod(self, module, g_inp, g_out, mat):
         return self._jac_t_mat_prod(module, g_inp, g_out, mat)
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         """
         Note:
         -----
@@ -29,7 +29,14 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
         -----------
         https://kevinzakka.github.io/2016/09/14/batch_normalization/
         https://chrisyeh96.github.io/2017/08/28/deriving-batchnorm-backprop.html
+
+        Raises:
+        -------
+        NotImplementedError
+            If subsampling is enabled.
+
         """
+        self._no_subsampling(subsampling)
         assert module.affine is True
 
         N = module.input0.size(0)
@@ -99,7 +106,7 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
         self, module, g_inp, g_out, mat, sum_batch, subsampling=None
     ):
         self._maybe_warn_no_batch_summation(sum_batch)
-        self._no_subsampling_support(subsampling)
+        self._no_subsampling(subsampling)
 
         x_hat, _ = self.get_normalized_input_and_var(module)
         equation = "vni,ni->v{}i".format("" if sum_batch is True else "n")
@@ -114,7 +121,7 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
         self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
     ):
         self._maybe_warn_no_batch_summation(sum_batch)
-        self._no_subsampling_support(subsampling)
+        self._no_subsampling(subsampling)
 
         if not sum_batch:
             return mat
@@ -136,8 +143,8 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
             )
 
     @staticmethod
-    def _no_subsampling_support(subsampling):
-        """Subsampling is not supported.
+    def _no_subsampling(subsampling):
+        """Raise exception if subsampling is enabled.
 
         Args:
             subsampling ([int] or None): Indices of samples to be considered. ``None``

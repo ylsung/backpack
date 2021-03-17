@@ -8,8 +8,8 @@ class FlattenDerivatives(BaseDerivatives):
     def ea_jac_t_mat_jac_prod(self, module, g_inp, g_out, mat):
         return mat
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
-        return self.reshape_like_input(mat, module)
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
+        return self.reshape_like_input(mat, module, subsampling=subsampling)
 
     def _jac_mat_prod(self, module, g_inp, g_out, mat):
         return self.reshape_like_output(mat, module)

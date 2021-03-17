@@ -152,10 +152,10 @@ class ConvTransposeNDDerivatives(BaseParameterDerivatives):
         )
         return jac_t_mat
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         mat_as_conv = rearrange(mat, "v n c ... -> (v n) c ...")
         jmp_as_conv = self.__jac_t(module, mat_as_conv)
-        return self.reshape_like_input(jmp_as_conv, module)
+        return self.reshape_like_input(jmp_as_conv, module, subsampling=subsampling)
 
     def __jac_t(self, module, mat):
         jac_t = self.conv_func(

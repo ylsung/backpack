@@ -27,7 +27,7 @@ class ZeroPad2dDerivatives(BaseDerivatives):
 
         return result.view(in_features, in_features)
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         (W_top, W_bottom), (H_bottom, H_top) = self.__unpad_indices(module)
         return mat[:, :, :, W_top:W_bottom, H_bottom:H_top]
 

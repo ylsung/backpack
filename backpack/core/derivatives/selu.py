@@ -1,6 +1,7 @@
 from torch import exp, gt
 
 from backpack.core.derivatives.elementwise import ElementwiseDerivatives
+from backpack.core.derivatives.subsampling import subsample_input
 
 
 class SELUDerivatives(ElementwiseDerivatives):
@@ -13,14 +14,15 @@ class SELUDerivatives(ElementwiseDerivatives):
         """`SELU''(x) != 0`."""
         return False
 
-    def df(self, module, g_inp, g_out):
+    def df(self, module, g_inp, g_out, subsampling=None):
         """First SELU derivative: `SELU'(x) = scale if x < 0 else scale*alpha*e^x`. """
+        input = subsample_input(module, subsampling=subsampling)
 
-        df_SELU = gt(module.input0, 0).float()
+        df_SELU = gt(input, 0).float()
         df_SELU[df_SELU == 1] = self.scale
-        df_SELU[df_SELU == 0] = (
-            self.scale * self.alpha * exp(module.input0[df_SELU == 0])
-        )
+        idx_zero = df_SELU == 0
+        df_SELU[idx_zero] = self.scale * self.alpha * exp(input[idx_zero])
+
         return df_SELU
 
     def d2f(self, module, g_inp, g_out):

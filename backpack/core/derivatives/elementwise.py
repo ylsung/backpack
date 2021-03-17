@@ -20,16 +20,19 @@ class ElementwiseDerivatives(BaseDerivatives):
           - If the activation is piece-wise linear: `hessian_is_zero`, else `d2f`.
     """
 
-    def df(self, module, g_inp, g_out):
+    def df(self, module, g_inp, g_out, subsampling=None):
         """Elementwise first derivative.
 
         Args:
             module (torch.nn.Module): PyTorch activation function module.
             g_inp ([torch.Tensor]): Gradients of the module w.r.t. its inputs.
             g_out ([torch.Tensor]): Gradients of the module w.r.t. its outputs.
+            subsampling list(int): Indices of samples to be considered. If ``None``,
+                use all samples.
 
         Returns:
-            (torch.Tensor): Tensor containing the derivatives `f'(input[i]) ∀ i`.
+            (torch.Tensor): Tensor containing the derivatives ``f'(input[i]) ∀ i``
+                (for the entire, or a subset of the, mini-batch).
         """
 
         raise NotImplementedError("First derivatives not implemented")
@@ -73,10 +76,10 @@ class ElementwiseDerivatives(BaseDerivatives):
         """
         return True
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         self._no_inplace(module)
 
-        df_elementwise = self.df(module, g_inp, g_out)
+        df_elementwise = self.df(module, g_inp, g_out, subsampling=subsampling)
         return einsum("...,v...->v...", (df_elementwise, mat))
 
     def _jac_mat_prod(self, module, g_inp, g_out, mat):

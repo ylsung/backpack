@@ -73,14 +73,13 @@ class ConvNDDerivatives(BaseParameterDerivatives):
         )
         return self.reshape_like_output(jmp_as_conv, module)
 
-    def _jac_t_mat_prod(self, module, g_inp, g_out, mat):
+    def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
         mat_as_conv = rearrange(mat, "v n c ... -> (v n) c ...")
         jmp_as_conv = self.__jac_t(module, mat_as_conv)
-        return self.reshape_like_input(jmp_as_conv, module)
+        return self.reshape_like_input(jmp_as_conv, module, subsampling=subsampling)
 
     def __jac_t(self, module, mat):
-        input_size = list(module.input0.size())
-        input_size[0] = mat.size(0)
+        input_size = [mat.size(0)] + list(module.input0.size())[1:]
 
         grad_padding = _grad_input_padding(
             grad_output=mat,

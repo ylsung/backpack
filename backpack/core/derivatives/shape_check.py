@@ -4,7 +4,7 @@ Helpers to check input and output sizes of Jacobian-matrix products.
 """
 import functools
 
-from backpack.core.derivatives.subsampling import subsample_output
+from backpack.core.derivatives.subsampling import subsample_input, subsample_output
 
 
 ###############################################################################
@@ -48,7 +48,9 @@ def check_same_V_dim(mat1, mat2):
 
 
 def check_like(mat, module, name, diff=1, *args, **kwargs):
-    if name == "output" and "subsampling" in kwargs.keys():
+    if name == "input0" and "subsampling" in kwargs.keys():
+        compare = subsample_input(module, subsampling=kwargs["subsampling"])
+    elif name == "output" and "subsampling" in kwargs.keys():
         compare = subsample_output(module, subsampling=kwargs["subsampling"])
     else:
         compare = getattr(module, name)

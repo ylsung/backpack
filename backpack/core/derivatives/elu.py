@@ -1,6 +1,7 @@
 from torch import exp, gt
 
 from backpack.core.derivatives.elementwise import ElementwiseDerivatives
+from backpack.core.derivatives.subsampling import subsample_input
 
 
 class ELUDerivatives(ElementwiseDerivatives):
@@ -8,10 +9,14 @@ class ELUDerivatives(ElementwiseDerivatives):
         """`ELU''(x) ≠ 0`."""
         return False
 
-    def df(self, module, g_inp, g_out):
+    def df(self, module, g_inp, g_out, subsampling=None):
         """First ELU derivative: `ELU'(x) = alpha * e^x if x < 0 else 1`. """
-        df_ELU = gt(module.input0, 0).float()
-        df_ELU[df_ELU == 0] = module.alpha * exp(module.input0[df_ELU == 0])
+        input = subsample_input(module, subsampling=subsampling)
+
+        df_ELU = gt(input, 0).float()
+        idx_zero = df_ELU == 0
+        df_ELU[idx_zero] = module.alpha * exp(input[idx_zero])
+
         return df_ELU
 
     def d2f(self, module, g_inp, g_out):

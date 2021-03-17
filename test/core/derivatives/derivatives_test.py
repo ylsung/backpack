@@ -50,51 +50,6 @@ SUBSAMPLINGS = [None, [0]]
 SUBSAMPLINGS_IDS = [f"subsampling={subsampling}" for subsampling in SUBSAMPLINGS]
 
 
-@pytest.mark.parametrize("problem", NO_LOSS_PROBLEMS, ids=NO_LOSS_IDS)
-def test_jac_mat_prod(problem, V=3):
-    """Test the Jacobian-matrix product.
-
-    Args:
-        problem (DerivativesProblem): Problem for derivative test.
-        V (int): Number of vectorized Jacobian-vector products.
-    """
-    problem.set_up()
-    mat = torch.rand(V, *problem.input_shape).to(problem.device)
-
-    backpack_res = BackpackDerivatives(problem).jac_mat_prod(mat)
-    autograd_res = AutogradDerivatives(problem).jac_mat_prod(mat)
-
-    check_sizes_and_values(autograd_res, backpack_res)
-    problem.tear_down()
-
-
-@pytest.mark.parametrize("problem", NO_LOSS_PROBLEMS, ids=NO_LOSS_IDS)
-def test_jac_t_mat_prod(problem, V=3):
-    """Test the transposed Jacobian-matrix product.
-
-    Args:
-        problem (DerivativesProblem): Problem for derivative test.
-        V (int): Number of vectorized transposed Jacobian-vector products.
-    """
-    problem.set_up()
-
-    mat = torch.rand(V, *problem.output_shape).to(problem.device)
-
-    backpack_res = BackpackDerivatives(problem).jac_t_mat_prod(mat)
-    autograd_res = AutogradDerivatives(problem).jac_t_mat_prod(mat)
-
-    check_sizes_and_values(autograd_res, backpack_res)
-    problem.tear_down()
-
-
-PROBLEMS_WITH_WEIGHTS = []
-IDS_WITH_WEIGHTS = []
-for problem, problem_id in zip(PROBLEMS, IDS):
-    if problem.has_weight():
-        PROBLEMS_WITH_WEIGHTS.append(problem)
-        IDS_WITH_WEIGHTS.append(problem_id)
-
-
 def rand_mat_like_output(V, output_shape, subsampling=None):
     """Generate random matrix whose columns are shaped like the layer output.
 
@@ -116,6 +71,59 @@ def rand_mat_like_output(V, output_shape, subsampling=None):
         subsample_shape[N_axis] = len(subsampling)
 
     return torch.rand(V, *subsample_shape)
+
+
+@pytest.mark.parametrize("problem", NO_LOSS_PROBLEMS, ids=NO_LOSS_IDS)
+def test_jac_mat_prod(problem, V=3):
+    """Test the Jacobian-matrix product.
+
+    Args:
+        problem (DerivativesProblem): Problem for derivative test.
+        V (int): Number of vectorized Jacobian-vector products.
+    """
+    problem.set_up()
+    mat = torch.rand(V, *problem.input_shape).to(problem.device)
+
+    backpack_res = BackpackDerivatives(problem).jac_mat_prod(mat)
+    autograd_res = AutogradDerivatives(problem).jac_mat_prod(mat)
+
+    check_sizes_and_values(autograd_res, backpack_res)
+    problem.tear_down()
+
+
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
+@pytest.mark.parametrize("problem", NO_LOSS_PROBLEMS, ids=NO_LOSS_IDS)
+def test_jac_t_mat_prod(problem, subsampling, V=3):
+    """Test the transposed Jacobian-matrix product.
+
+    Args:
+        problem (DerivativesProblem): Problem for derivative test.
+        V (int): Number of vectorized transposed Jacobian-vector products.
+        subsampling ([int] or None): Indices of samples used by sub-sampling.
+    """
+    problem.set_up()
+
+    mat = rand_mat_like_output(V, problem.output_shape, subsampling=subsampling).to(
+        problem.device
+    )
+
+    backpack_res = BackpackDerivatives(problem).jac_t_mat_prod(
+        mat, subsampling=subsampling
+    )
+    autograd_res = AutogradDerivatives(problem).jac_t_mat_prod(
+        mat, subsampling=subsampling
+    )
+
+    check_sizes_and_values(autograd_res, backpack_res)
+    problem.tear_down()
+
+
+PROBLEMS_WITH_WEIGHTS = []
+IDS_WITH_WEIGHTS = []
+for problem, problem_id in zip(PROBLEMS, IDS):
+    if problem.has_weight():
+        PROBLEMS_WITH_WEIGHTS.append(problem)
+        IDS_WITH_WEIGHTS.append(problem_id)
 
 
 @pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)

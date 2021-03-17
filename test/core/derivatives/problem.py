@@ -138,11 +138,24 @@ class DerivativesTestProblem:
         return is_loss(self.make_module())
 
     def forward_pass(self, input_requires_grad=False, sample_idx=None):
-        """Do a forward pass. Return input, output, and parameters."""
-        if sample_idx is None:
-            input = self.input.clone().detach()
-        else:
-            input = self.input.clone()[sample_idx, :].unsqueeze(0).detach()
+        """Do a forward pass. Return input, output, and parameters.
+
+        Args:
+            sample_idx ([int], int or None): Indices of samples to use. ``None``
+                uses all samples. Integer denotes the index of a single sample, and
+                list of integers refers to a set of samples.
+
+        Returns:
+            (torch.Tensor, torch.Tensor, dict): First tensor is the forward passes'
+                input, second tensor is the model output, i.e. the forward passes'
+                evaluation of the first tensor. Dictionary contains (name, parameter)
+                pairs of the module.
+        """
+        input = self.input.clone().detach()
+
+        if sample_idx is not None:
+            idx = [sample_idx] if isinstance(sample_idx, int) else sample_idx
+            input = input[idx]
 
         if input_requires_grad:
             input.requires_grad = True
