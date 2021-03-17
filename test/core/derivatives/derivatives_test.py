@@ -265,22 +265,24 @@ def test_bias_jac_mat_prod(problem, V=3):
     problem.tear_down()
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", LOSS_PROBLEMS, ids=LOSS_IDS)
-def test_sqrt_hessian_squared_equals_hessian(problem):
+def test_sqrt_hessian_squared_equals_hessian(problem, subsampling):
     """Test the sqrt decomposition of the input Hessian.
 
     Args:
         problem (DerivativesProblem): Problem for derivative test.
+        subsampling ([int]): Sample indices for which the symmetric factorization
+            of the loss Hessian is computed. If ``None``, use all samples in mini-batch.
 
     Compares the Hessian to reconstruction from individual Hessian sqrt.
     """
     problem.set_up()
 
-    backpack_res = BackpackDerivatives(problem).input_hessian_via_sqrt_hessian()
-    autograd_res = AutogradDerivatives(problem).input_hessian()
-
-    print(backpack_res.device)
-    print(autograd_res.device)
+    backpack_res = BackpackDerivatives(problem).input_hessian_via_sqrt_hessian(
+        subsampling=subsampling
+    )
+    autograd_res = AutogradDerivatives(problem).input_hessian(subsampling=subsampling)
 
     check_sizes_and_values(autograd_res, backpack_res)
     problem.tear_down()
@@ -317,37 +319,44 @@ def test_weight_jac_t_mat_prod_should_fail(
         )
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", LOSS_FAIL_PROBLEMS, ids=LOSS_FAIL_IDS)
-def test_sqrt_hessian_should_fail(problem):
+def test_sqrt_hessian_should_fail(problem, subsampling):
     with pytest.raises(ValueError):
-        test_sqrt_hessian_squared_equals_hessian(problem)
+        test_sqrt_hessian_squared_equals_hessian(problem, subsampling)
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", LOSS_PROBLEMS, ids=LOSS_IDS)
-def test_sqrt_hessian_sampled_squared_approximates_hessian(problem, mc_samples=100000):
+def test_sqrt_hessian_sampled_squared_approximates_hessian(
+    problem, subsampling, mc_samples=100000
+):
     """Test the MC-sampled sqrt decomposition of the input Hessian.
 
     Args:
         problem (DerivativesProblem): Problem for derivative test.
+        subsampling ([int]): Sample indices for which the symmetric factorization
+            of the loss Hessian is computed. If ``None``, use all samples in mini-batch.
 
     Compares the Hessian to reconstruction from individual Hessian MC-sampled sqrt.
     """
     problem.set_up()
 
     backpack_res = BackpackDerivatives(problem).input_hessian_via_sqrt_hessian(
-        mc_samples=mc_samples
+        mc_samples=mc_samples, subsampling=subsampling
     )
-    autograd_res = AutogradDerivatives(problem).input_hessian()
+    autograd_res = AutogradDerivatives(problem).input_hessian(subsampling=subsampling)
 
     RTOL, ATOL = 1e-2, 2e-2
     check_sizes_and_values(autograd_res, backpack_res, rtol=RTOL, atol=ATOL)
     problem.tear_down()
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", LOSS_FAIL_PROBLEMS, ids=LOSS_FAIL_IDS)
-def test_sqrt_hessian_sampled_should_fail(problem):
+def test_sqrt_hessian_sampled_should_fail(problem, subsampling):
     with pytest.raises(ValueError):
-        test_sqrt_hessian_sampled_squared_approximates_hessian(problem)
+        test_sqrt_hessian_sampled_squared_approximates_hessian(problem, subsampling)
 
 
 @pytest.mark.parametrize("problem", LOSS_PROBLEMS, ids=LOSS_IDS)

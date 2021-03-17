@@ -2,6 +2,8 @@ from test.core.derivatives.implementation.base import DerivativesImplementation
 
 import torch
 
+from backpack.core.derivatives.subsampling import subsample_input
+
 
 class BackpackDerivatives(DerivativesImplementation):
     """Derivative implementations with BackPACK."""
@@ -69,24 +71,26 @@ class BackpackDerivatives(DerivativesImplementation):
         self.store_forward_io()
         return self.problem.derivative.sum_hessian(self.problem.module, None, None)
 
-    def input_hessian_via_sqrt_hessian(self, mc_samples=None):
-        # MC_SAMPLES = 100000
+    def input_hessian_via_sqrt_hessian(self, mc_samples=None, subsampling=None):
         self.store_forward_io()
 
         if mc_samples is not None:
             sqrt_hessian = self.problem.derivative.sqrt_hessian_sampled(
-                self.problem.module, None, None, mc_samples=mc_samples
+                self.problem.module,
+                None,
+                None,
+                mc_samples=mc_samples,
+                subsampling=subsampling,
             )
         else:
             sqrt_hessian = self.problem.derivative.sqrt_hessian(
-                self.problem.module, None, None
+                self.problem.module, None, None, subsampling=subsampling
             )
 
         individual_hessians = self._sample_hessians_from_sqrt(sqrt_hessian)
 
-        return self._embed_sample_hessians(
-            individual_hessians, self.problem.module.input0
-        )
+        input = subsample_input(self.problem.module, subsampling=subsampling)
+        return self._embed_sample_hessians(individual_hessians, input)
 
     def hessian_is_zero(self):
         """Return whether the input-output Hessian is zero.
@@ -110,16 +114,15 @@ class BackpackDerivatives(DerivativesImplementation):
         return torch.einsum(equation, sqrt, sqrt)
 
     def _embed_sample_hessians(self, individual_hessians, input):
+        """Embed Hessians w.r.t. individual samples into Hessian w.r.t. all samples."""
         hessian_shape = (*input.shape, *input.shape)
         hessian = torch.zeros(hessian_shape, device=input.device)
 
-        N = input.shape[0]
-
-        for n in range(N):
+        for idx in range(input.shape[0]):
             num_axes = len(input.shape)
 
             if num_axes == 2:
-                hessian[n, :, n, :] = individual_hessians[n]
+                hessian[idx, :, idx, :] = individual_hessians[idx]
             else:
                 raise ValueError("Only 2D inputs are currently supported.")
 

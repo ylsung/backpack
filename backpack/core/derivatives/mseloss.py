@@ -16,25 +16,29 @@ class MSELossDerivatives(BaseLossDerivatives):
     `∑ᵢ₌₁ⁿ ‖X[i,∶] − Y[i,∶]‖²`. If `reduce=mean`, the result is divided by `nd`.
     """
 
-    def _sqrt_hessian(self, module, g_inp, g_out):
-        """Square-root of the hessian of the MSE for each minibatch elements.
+    def _sqrt_hessian(self, module, g_inp, g_out, subsampling=None):
+        """Square-root of the Hessian w.r.t each sample.
 
-        Returns the Hessian in format `Hs = [D, N, D]`, where
-        `Hs[:, n, :]` is the Hessian for the `n`th element.
+        Returns the Hessian factorization in format ``Hs = [D, N, D]``, where
+        ``Hs[:, n, :]`` is the Hessian factorization for the ``n``th element.
 
-        Attributes:
-            module: (torch.nn.MSELoss) module
-            g_inp: Gradient of loss w.r.t. input
-            g_out: Gradient of loss w.r.t. output
+        Args:
+            module (torch.nn.MSELoss): Extended loss module.
+            g_inp (torch.Tensor): Gradient of loss w.r.t. input.
+            g_out ([torch.Tensor]): Gradient of loss w.r.t. output.
+            subsampling ([int]): Indices of data samples to be considered.
+                If ``None``, use all data in the mini-batch.
 
         Returns:
-             Batch of hessians, in format [D, N, D]
+             torch.Tensor: Batch of Hessian factorizations in format ``[D, N, D]``.
         """
         self.check_input_dims(module)
 
         N, D = module.input0.shape
+        N_subsampling = N if subsampling is None else len(subsampling)
+
         sqrt_H = sqrt(2) * eye(D, device=module.input0.device)  # [D, D]
-        sqrt_H = sqrt_H.unsqueeze(0).repeat(N, 1, 1)  # [N, D, D]
+        sqrt_H = sqrt_H.unsqueeze(0).repeat(N_subsampling, 1, 1)  # [N, D, D]
         sqrt_H = einsum("nab->anb", sqrt_H)  # [D, N, D]
 
         if module.reduction == "mean":
@@ -42,20 +46,33 @@ class MSELossDerivatives(BaseLossDerivatives):
 
         return sqrt_H
 
-    def _sqrt_hessian_sampled(self, module, g_inp, g_out, mc_samples=1):
+    def _sqrt_hessian_sampled(
+        self, module, g_inp, g_out, mc_samples=1, subsampling=None
+    ):
         """A Monte-Carlo estimate of the square-root of the Hessian.
 
-        Attributes:
-            module: (torch.nn.MSELoss) module.
-            g_inp: Gradient of loss w.r.t. input.
-            g_out: Gradient of loss w.r.t. output.
-            mc_samples: (int, optional) Number of MC samples to use. Default: 1.
+        Returns the Hessian factorization in format ``Hs = [M, N, D]``, where
+        ``Hs[:, n, :]`` approximates the Hessian factorization for the ``n``th element.
+        ``M`` is the number of MC samples, ``N`` is the batch size, and ``D`` are
+        the input features.
+
+        Args:
+            module (torch.nn.MSELoss): Extended loss module.
+            g_inp (torch.Tensor): Gradient of loss w.r.t. input.
+            g_out ([torch.Tensor]): Gradient of loss w.r.t. output.
+            mc_samples (int, optional): Number of MC samples to use. Default: 1.
+            subsampling ([int], optional): Indices of data samples to be considered.
+                Default: ``None``, i.e. use all data in the mini-batch.
 
         Returns:
-            tensor:
+             torch.Tensor: Batch of Hessian factorizations in format ``[M, N, D]``.
         """
         N, D = module.input0.shape
-        samples = normal(0, 1, size=[mc_samples, N, D], device=module.input0.device)
+        N_subsampling = N if subsampling is None else len(subsampling)
+
+        samples = normal(
+            0, 1, size=[mc_samples, N_subsampling, D], device=module.input0.device
+        )
         samples *= sqrt(2) / sqrt(mc_samples)
 
         if module.reduction == "mean":

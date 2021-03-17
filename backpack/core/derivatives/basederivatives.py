@@ -340,21 +340,55 @@ class BaseLossDerivatives(BaseDerivatives):
     """Second- order partial derivatives of loss functions."""
 
     # TODO Add shape check
-    def sqrt_hessian(self, module, g_inp, g_out):
-        """Symmetric factorization ('sqrt') of the loss Hessian."""
-        self.check_2nd_order_make_sense(module, g_inp, g_out)
-        return self._sqrt_hessian(module, g_inp, g_out)
+    def sqrt_hessian(self, module, g_inp, g_out, subsampling=None):
+        """Symmetric factorization ('sqrt') of the loss Hessian.
 
-    def _sqrt_hessian(self, module, g_inp, g_out):
+        Args:
+            mc_samples (int): Number of samples used for MC approximation.
+            subsampling ([int]): Indices of data samples to be considered.
+                If ``None``, use all data in the mini-batch.
+
+        Returns:
+            torch.Tensor: Symmetric factorization of the loss Hessian for each
+                sample. If the input to the loss has shape ``[N, D]``, this is
+                a tensor of shape ``[D, N, D]``. For fixed ``n``, squaring
+                the matrix implied by the slice ``[:, n, :]`` results in the loss
+                Hessian w.r.t. to sample ``n``.
+        """
+        self.check_2nd_order_make_sense(module, g_inp, g_out)
+        return self._sqrt_hessian(module, g_inp, g_out, subsampling=subsampling)
+
+    def _sqrt_hessian(self, module, g_inp, g_out, subsampling=None):
+        """Internal implementation of the loss Hessian's symmetric factorization."""
         raise NotImplementedError
 
     # TODO Add shape check
-    def sqrt_hessian_sampled(self, module, g_inp, g_out, mc_samples=1):
-        """Monte-Carlo sampled symmetric factorization of the loss Hessian."""
-        self.check_2nd_order_make_sense(module, g_inp, g_out)
-        return self._sqrt_hessian_sampled(module, g_inp, g_out, mc_samples=mc_samples)
+    def sqrt_hessian_sampled(
+        self, module, g_inp, g_out, mc_samples=1, subsampling=None
+    ):
+        """Monte-Carlo sampled symmetric factorization of the loss Hessian.
 
-    def _sqrt_hessian_sampled(self, module, g_inp, g_out, mc_samples=1):
+        Args:
+            mc_samples (int): Number of samples used for MC approximation.
+            subsampling ([int]): Indices of data samples to be considered.
+                If ``None``, use all data in the mini-batch.
+
+        Returns:
+            torch.Tensor: Symmetric factorization of the loss Hessian for each
+                sample. If the input to the loss has shape ``[N, D]``, this is
+                a tensor of shape ``[M, N, D]`` when using ``M`` MC samples.
+                For fixed ``n``, squaring the matrix implied by the slice ``[:, n, :]``
+                approximates the loss Hessian w.r.t. to sample ``n``.
+        """
+        self.check_2nd_order_make_sense(module, g_inp, g_out)
+        return self._sqrt_hessian_sampled(
+            module, g_inp, g_out, mc_samples=mc_samples, subsampling=subsampling
+        )
+
+    def _sqrt_hessian_sampled(
+        self, module, g_inp, g_out, mc_samples=1, subsampling=None
+    ):
+        """Internal implementation of symmetric Hessian factorization via MC."""
         raise NotImplementedError
 
     @shape_check.make_hessian_mat_prod_accept_vectors

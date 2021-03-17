@@ -6,6 +6,7 @@ from torch import sqrt as torchsqrt
 from torch.nn.functional import one_hot
 
 from backpack.core.derivatives.basederivatives import BaseLossDerivatives
+from backpack.core.derivatives.subsampling import subsample_input
 
 
 class CrossEntropyLossDerivatives(BaseLossDerivatives):
@@ -15,10 +16,25 @@ class CrossEntropyLossDerivatives(BaseLossDerivatives):
     and negative log-likelihood.
     """
 
-    def _sqrt_hessian(self, module, g_inp, g_out):
+    def _sqrt_hessian(self, module, g_inp, g_out, subsampling=None):
+        """Square-root of the Hessian w.r.t. each sample.
+
+        Returns the Hessian factorization in format ``Hs = [D, N, D]``, where
+        ``Hs[:, n, :]`` is the Hessian factorization for the `n`th element.
+
+        Args:
+            module (torch.nn.CrossEntropyLoss): Extended loss module.
+            g_inp (torch.Tensor): Gradient of loss w.r.t. input.
+            g_out ([torch.Tensor]): Gradient of loss w.r.t. output.
+            subsampling ([int], optional): Indices of data samples to be considered.
+                Default: ``None``, i.e. use all data in the mini-batch.
+
+        Returns:
+             torch.Tensor: Batch of Hessian factorizations in format ``[D, N, D]``.
+        """
         self._check_2nd_order_parameters(module)
 
-        probs = self._get_probs(module)
+        probs = self._get_probs(module, subsampling=subsampling)
         tau = torchsqrt(probs)
         V_dim, C_dim = 0, 2
         Id = diag_embed(ones_like(probs), dim1=V_dim, dim2=C_dim)
@@ -31,13 +47,34 @@ class CrossEntropyLossDerivatives(BaseLossDerivatives):
 
         return sqrt_H
 
-    def _sqrt_hessian_sampled(self, module, g_inp, g_out, mc_samples=1):
+    def _sqrt_hessian_sampled(
+        self, module, g_inp, g_out, mc_samples=1, subsampling=None
+    ):
+        """A Monte-Carlo estimate of the square-root of the Hessian.
+
+        Returns the Hessian factorization in format ``Hs = [M, N, D]``, where
+        ``Hs[:, n, :]`` approximates the Hessian factorization for the ``n``th element.
+
+        ``M`` is the number of MC samples, ``N`` is the batch size, and ``D`` are
+        the input features.
+
+        Args:
+            module (torch.nn.CrossEntropyLoss): Extended loss module.
+            g_inp (torch.Tensor): Gradient of loss w.r.t. input.
+            g_out ([torch.Tensor]): Gradient of loss w.r.t. output.
+            mc_samples (int, optional): Number of MC samples to use. Default: 1.
+            subsampling ([int], optional): Indices of data samples to be considered.
+                Default: ``None``, i.e. use all data in the mini-batch.
+
+        Returns:
+             torch.Tensor: Batch of Hessian factorizations in format ``[M, N, D]``.
+        """
         self._check_2nd_order_parameters(module)
 
         M = mc_samples
         C = module.input0.shape[1]
 
-        probs = self._get_probs(module)
+        probs = self._get_probs(module, subsampling=subsampling)
         V_dim = 0
         probs_unsqueezed = probs.unsqueeze(V_dim).repeat(M, 1, 1)
 
@@ -88,8 +125,15 @@ class CrossEntropyLossDerivatives(BaseLossDerivatives):
         """Return whether cross-entropy loss Hessian is positive semi-definite."""
         return True
 
-    def _get_probs(self, module):
-        return softmax(module.input0, dim=1)
+    def _get_probs(self, module, subsampling=None):
+        """Compute softmax probabilities from module input.
+
+        Returns:
+            torch.Tensor: Softmax probabilities used in the cross-entropy loss.
+        """
+        input = subsample_input(module, subsampling=subsampling)
+
+        return softmax(input, dim=1)
 
     def _check_2nd_order_parameters(self, module):
         """Verify that the parameters are supported by 2nd-order quantities.

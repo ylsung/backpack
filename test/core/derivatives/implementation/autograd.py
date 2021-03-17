@@ -217,10 +217,12 @@ class AutogradDerivatives(DerivativesImplementation):
 
         return True
 
-    def input_hessian(self):
+    def input_hessian(self, subsampling=None):
         """Compute the Hessian of the module output w.r.t. the input."""
         input, output, _ = self.problem.forward_pass(input_requires_grad=True)
-        return self.hessian(output, input)
+        hessian = self.hessian(output, input)
+
+        return self._subsample_input_hessian(hessian, input, subsampling=subsampling)
 
     def sum_hessian(self):
         """Compute the Hessian of a loss module w.r.t. its input."""
@@ -258,3 +260,27 @@ class AutogradDerivatives(DerivativesImplementation):
                     assert torch.allclose(block, hessian_different_samples)
 
         return sum_hessian
+
+    @staticmethod
+    def _subsample_input_hessian(hessian, input, subsampling=None):
+        """Slice sub-samples out of Hessian w.r.t the full input.
+
+        If ``subsampling`` is set to ``None``, this leaves the Hessian unchanged.
+
+        Returns:
+            torch.Tensor: Subsample Hessian of shape ``[N, *, N, *]`` where ``N``
+                denotes the number of sub-samples, and ``*`` is the input feature shape.
+        """
+        N, D_shape = input.shape[0], input.shape[1:]
+        D = input.numel() // N
+
+        N_subsampling = N if subsampling is None else len(subsampling)
+
+        subsampled_hessian = hessian.reshape(N, D, N, D)
+        subsampled_hessian = subsampled_hessian[subsampling, :, :, :][
+            :, :, subsampling, :
+        ]
+
+        out_shape = [N_subsampling, *D_shape, N_subsampling, *D_shape]
+
+        return subsampled_hessian.reshape(out_shape)
