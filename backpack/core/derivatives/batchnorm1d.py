@@ -95,12 +95,12 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
         x_hat, _ = self.get_normalized_input_and_var(module)
         return einsum("ni,vi->vni", (x_hat, mat))
 
-    def _weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch):
-        if not sum_batch:
-            warn(
-                "BatchNorm batch summation disabled."
-                "This may not compute meaningful quantities"
-            )
+    def _weight_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch, subsampling=None
+    ):
+        self._maybe_warn_no_batch_summation(sum_batch)
+        self._no_subsampling_support(subsampling)
+
         x_hat, _ = self.get_normalized_input_and_var(module)
         equation = "vni,ni->v{}i".format("" if sum_batch is True else "n")
         operands = [mat, x_hat]
@@ -110,13 +110,41 @@ class BatchNorm1dDerivatives(BaseParameterDerivatives):
         N = module.input0.size(0)
         return mat.unsqueeze(1).repeat(1, N, 1)
 
-    def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _bias_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
+        self._maybe_warn_no_batch_summation(sum_batch)
+        self._no_subsampling_support(subsampling)
+
+        if not sum_batch:
+            return mat
+        else:
+            N_axis = 1
+            return mat.sum(N_axis)
+
+    @staticmethod
+    def _maybe_warn_no_batch_summation(sum_batch):
+        """Jacobians w.r.t. single samples are meaningless because BN mixes samples.
+
+        Args:
+            sum_batch (bool): Whether to sum out the batch dimension.
+        """
         if not sum_batch:
             warn(
                 "BatchNorm batch summation disabled."
                 "This may not compute meaningful quantities"
             )
-            return mat
-        else:
-            N_axis = 1
-            return mat.sum(N_axis)
+
+    @staticmethod
+    def _no_subsampling_support(subsampling):
+        """Subsampling is not supported.
+
+        Args:
+            subsampling ([int] or None): Indices of samples to be considered. ``None``
+                signifies that all samples are used.
+
+        Raises:
+            NotImplementedError: If any subset of samples is considered.
+        """
+        if subsampling is not None:
+            raise NotImplementedError("Subsampling not supported by BatchNorm.")

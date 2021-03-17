@@ -4,8 +4,14 @@ class ExtensionsImplementation:
     def __init__(self, problem):
         self.problem = problem
 
-    def batch_grad(self):
-        """Individual gradients."""
+    def batch_grad(self, subsampling=None):
+        """Individual gradients for samples in (the subset of) a mini-batch.
+
+        Args:
+            subsampling ([int], optional): Indices of samples in the mini-batch
+                for which individual gradients should be computed. Default value
+                ``None`` uses the entire mini-batch.
+        """
         raise NotImplementedError
 
     def batch_l2_grad(self):

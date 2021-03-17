@@ -16,8 +16,8 @@ class BackpackExtensions(ExtensionsImplementation):
         problem.extend()
         super().__init__(problem)
 
-    def batch_grad(self):
-        with backpack(new_ext.BatchGrad()):
+    def batch_grad(self, subsampling=None):
+        with backpack(new_ext.BatchGrad(subsampling=subsampling)):
             _, _, loss = self.problem.forward_pass()
             loss.backward()
             batch_grads = [p.grad_batch for p in self.problem.model.parameters()]

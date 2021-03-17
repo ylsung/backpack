@@ -1,6 +1,7 @@
 from torch import einsum
 
 from backpack.core.derivatives.basederivatives import BaseParameterDerivatives
+from backpack.core.derivatives.subsampling import subsample_input
 
 
 class LinearDerivatives(BaseParameterDerivatives):
@@ -36,9 +37,11 @@ class LinearDerivatives(BaseParameterDerivatives):
         d_weight = module.input0
         return einsum("ni,voi->vno", (d_weight, mat))
 
-    def _weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _weight_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         """Apply transposed Jacobian of the output w.r.t. the weight."""
-        d_weight = module.input0
+        d_weight = subsample_input(module, subsampling)
         contract = "vno,ni->voi" if sum_batch else "vno,ni->vnoi"
         return einsum(contract, (mat, d_weight))
 
@@ -47,7 +50,9 @@ class LinearDerivatives(BaseParameterDerivatives):
         N = module.input0.size(0)
         return mat.unsqueeze(1).expand(-1, N, -1)
 
-    def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _bias_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         """Apply transposed Jacobian of the output w.r.t. the bias."""
         if sum_batch:
             N_axis = 1

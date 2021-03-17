@@ -24,10 +24,15 @@ from . import (
 
 
 class BatchGrad(BackpropExtension):
-    """Individual gradients for each sample in a minibatch.
+    """Individual gradients for each sample in a mini-batch (or a subset).
 
-    Stores the output in ``grad_batch`` as a ``[N x ...]`` tensor,
-    where ``N`` batch size and ``...`` is the shape of the gradient.
+    Stores the output in ``grad_batch`` as a ``[N x ...]`` tensor, where
+    ``N`` is the batch (or subset) size and ``...`` is the gradient shape.
+
+    Args:
+        subsampling ([int], optional): Indices of samples in the mini-batch
+            for which individual gradients should be computed. Default value
+            ``None`` uses the entire mini-batch.
 
     Note: beware of scaling issue
         The `individual gradients` depend on the scaling of the overall function.
@@ -37,12 +42,14 @@ class BatchGrad(BackpropExtension):
         - ``[g₁, …, gₙ]`` if the loss is a sum, ``∑ᵢ₌₁ⁿ fᵢ``,
         - ``[¹/ₙ g₁, …, ¹/ₙ gₙ]`` if the loss is a mean, ``¹/ₙ ∑ᵢ₌₁ⁿ fᵢ``.
 
+        (only for the sample subset when ``subsampling`` is enabled)
+
     The concept of individual gradients is only meaningful if the
     objective is a sum of independent functions (no batchnorm).
 
     """
 
-    def __init__(self):
+    def __init__(self, subsampling=None):
         super().__init__(
             savefield="grad_batch",
             fail_mode="WARNING",
@@ -57,3 +64,8 @@ class BatchGrad(BackpropExtension):
                 BatchNorm1d: batchnorm1d.BatchGradBatchNorm1d(),
             },
         )
+        self._subsampling = subsampling
+
+    def get_subsampling(self):
+        """Return the indices of samples for which individual gradients are computed."""
+        return self._subsampling

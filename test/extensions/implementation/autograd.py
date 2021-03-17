@@ -10,7 +10,7 @@ from backpack.utils.convert_parameters import vector_to_parameter_list
 class AutogradExtensions(ExtensionsImplementation):
     """Extension implementations with autograd."""
 
-    def batch_grad(self):
+    def batch_grad(self, subsampling=None):
         N = self.problem.input.shape[0]
         batch_grads = [
             torch.zeros(N, *p.size()).to(self.problem.device)
@@ -31,6 +31,9 @@ class AutogradExtensions(ExtensionsImplementation):
         for b, gradients in zip(range(N), gradients_list):
             for idx, g in enumerate(gradients):
                 batch_grads[idx][b, :] = g.detach() * factor
+
+        if subsampling is not None:
+            batch_grads = [bg[subsampling] for bg in batch_grads]
 
         return batch_grads
 

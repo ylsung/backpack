@@ -218,7 +218,9 @@ class BaseParameterDerivatives(BaseDerivatives):
 
     @shape_check.bias_jac_t_mat_prod_accept_vectors
     @shape_check.bias_jac_t_mat_prod_check_shapes
-    def bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def bias_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         """Apply transposed Jacobian of the output w.r.t. bias to a matrix.
 
         Parameters:
@@ -228,6 +230,8 @@ class BaseParameterDerivatives(BaseDerivatives):
             Must have shape [V, N, C_out, H_out, ...].
         sum_batch: bool
             Whether to sum over the batch dimension on the fly.
+        subsampling: list(int)
+            Indices of samples to be considered. If ``None``, use all samples.
 
         Returns:
         --------
@@ -236,9 +240,13 @@ class BaseParameterDerivatives(BaseDerivatives):
             Has shape [V, N, C_b, ...] if `sum_batch == False`.
             Has shape [V, C_b, ...] if `sum_batch == True`.
         """
-        return self._bias_jac_t_mat_prod(module, g_inp, g_out, mat, sum_batch=sum_batch)
+        return self._bias_jac_t_mat_prod(
+            module, g_inp, g_out, mat, sum_batch=sum_batch, subsampling=subsampling
+        )
 
-    def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _bias_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         """Internal implementation of the transposed bias Jacobian."""
         raise NotImplementedError
 
@@ -267,7 +275,9 @@ class BaseParameterDerivatives(BaseDerivatives):
 
     @shape_check.weight_jac_t_mat_prod_accept_vectors
     @shape_check.weight_jac_t_mat_prod_check_shapes
-    def weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def weight_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         """Apply transposed Jacobian of the output w.r.t. weight to a matrix.
 
         Parameters:
@@ -277,6 +287,8 @@ class BaseParameterDerivatives(BaseDerivatives):
             Must have shape [V, N, C_out, H_out, ...].
         sum_batch: bool
             Whether to sum over the batch dimension on the fly.
+        subsampling: list(int)
+            Indices of samples to be considered. If ``None``, use all samples.
 
         Returns:
         --------
@@ -286,10 +298,12 @@ class BaseParameterDerivatives(BaseDerivatives):
             Has shape [V, C_w, H_w, ...] if `sum_batch == True`.
         """
         return self._weight_jac_t_mat_prod(
-            module, g_inp, g_out, mat, sum_batch=sum_batch
+            module, g_inp, g_out, mat, sum_batch=sum_batch, subsampling=subsampling
         )
 
-    def _weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _weight_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         """Internal implementation of transposed weight Jacobian."""
         raise NotImplementedError
 

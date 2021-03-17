@@ -13,6 +13,7 @@ from torch.nn.functional import (
 from torch.nn.grad import _grad_input_padding
 
 from backpack.core.derivatives.basederivatives import BaseParameterDerivatives
+from backpack.core.derivatives.subsampling import subsample_input
 from backpack.utils.conv_transpose import unfold_by_conv_transpose
 
 
@@ -37,7 +38,9 @@ class ConvTransposeNDDerivatives(BaseParameterDerivatives):
     def hessian_is_zero(self):
         return True
 
-    def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _bias_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         axes = list(range(3, len(module.output.shape) + 1))
         if sum_batch:
             axes = [1] + axes
@@ -76,19 +79,22 @@ class ConvTransposeNDDerivatives(BaseParameterDerivatives):
 
         return self.reshape_like_output(jac_mat, module)
 
-    def _weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
+    def _weight_jac_t_mat_prod(
+        self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
+    ):
         if module.groups != 1:
             raise NotImplementedError("Groups greater than 1 are not supported yet")
 
         V = mat.shape[0]
         G = module.groups
         C_in = module.input0.shape[1]
-        N = module.output.shape[0]
+        N = module.output.shape[0] if subsampling is None else len(subsampling)
         C_out = module.output.shape[1]
 
         mat_reshape = mat.reshape(V, N, G, C_out // G, *module.output.shape[2:])
 
-        u = unfold_by_conv_transpose(module.input0, module).reshape(
+        input = subsample_input(module, subsampling)
+        u = unfold_by_conv_transpose(input, module).reshape(
             N, C_in // G, G, *module.weight.shape[2:], *module.output.shape[2:]
         )
 

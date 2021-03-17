@@ -46,6 +46,9 @@ CONVOLUTION_TRANSPOSED_FAIL_IDS = [
     problem.make_id() for problem in CONVOLUTION_TRANSPOSED_FAIL_PROBLEMS
 ]
 
+SUBSAMPLINGS = [None, [0]]
+SUBSAMPLINGS_IDS = [f"subsampling={subsampling}" for subsampling in SUBSAMPLINGS]
+
 
 @pytest.mark.parametrize("problem", NO_LOSS_PROBLEMS, ids=NO_LOSS_IDS)
 def test_jac_mat_prod(problem, V=3):
@@ -74,6 +77,7 @@ def test_jac_t_mat_prod(problem, V=3):
         V (int): Number of vectorized transposed Jacobian-vector products.
     """
     problem.set_up()
+
     mat = torch.rand(V, *problem.output_shape).to(problem.device)
 
     backpack_res = BackpackDerivatives(problem).jac_t_mat_prod(mat)
@@ -91,6 +95,30 @@ for problem, problem_id in zip(PROBLEMS, IDS):
         IDS_WITH_WEIGHTS.append(problem_id)
 
 
+def rand_mat_like_output(V, output_shape, subsampling=None):
+    """Generate random matrix whose columns are shaped like the layer output.
+
+    Can be used to generate random inputs to functions that act on tensors
+    shaped like the module output (like ``*_jac_t_mat_prod``).
+
+    Args:
+        V (int): Number of rows.
+        output_shape ([int]): Shape of the module output.
+        subsampling ([int] or None): Indices of samples used by sub-sampling.
+
+    Returns:
+        torch.Tensor: Random matrix with (subsampled) output shape.
+    """
+    subsample_shape = list(output_shape)
+
+    if subsampling is not None:
+        N_axis = 0
+        subsample_shape[N_axis] = len(subsampling)
+
+    return torch.rand(V, *subsample_shape)
+
+
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize(
     "sum_batch", [True, False], ids=["sum_batch=True", "sum_batch=False"]
 )
@@ -104,23 +132,30 @@ for problem, problem_id in zip(PROBLEMS, IDS):
     PROBLEMS_WITH_WEIGHTS,
     ids=IDS_WITH_WEIGHTS,
 )
-def test_weight_jac_t_mat_prod(problem, sum_batch, save_memory, V=3):
+def test_weight_jac_t_mat_prod(problem, sum_batch, save_memory, subsampling, V=3):
     """Test the transposed Jacobian-matrix product w.r.t. to the weights.
 
     Args:
         problem (DerivativesProblem): Problem for derivative test.
         sum_batch (bool): Sum results over the batch dimension.
         save_memory (bool): Use Owkin implementation to save memory.
+        subsampling ([int] or None): Sample indices for which the transposed Jacobian
+            is applied. If ``None``, apply to all samples in mini-batch.
         V (int): Number of vectorized transposed Jacobian-vector products.
     """
     problem.set_up()
-    mat = torch.rand(V, *problem.output_shape).to(problem.device)
+
+    mat = rand_mat_like_output(V, problem.output_shape, subsampling=subsampling).to(
+        problem.device
+    )
 
     with weight_jac_t_save_memory(save_memory):
         backpack_res = BackpackDerivatives(problem).weight_jac_t_mat_prod(
-            mat, sum_batch
+            mat, sum_batch, subsampling=subsampling
         )
-    autograd_res = AutogradDerivatives(problem).weight_jac_t_mat_prod(mat, sum_batch)
+    autograd_res = AutogradDerivatives(problem).weight_jac_t_mat_prod(
+        mat, sum_batch, subsampling=subsampling
+    )
 
     check_sizes_and_values(autograd_res, backpack_res)
     problem.tear_down()
@@ -164,6 +199,7 @@ for problem, problem_id in zip(PROBLEMS, IDS):
         IDS_WITH_BIAS.append(problem_id)
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize(
     "sum_batch", [True, False], ids=["sum_batch=True", "sum_batch=False"]
 )
@@ -172,19 +208,28 @@ for problem, problem_id in zip(PROBLEMS, IDS):
     PROBLEMS_WITH_BIAS,
     ids=IDS_WITH_BIAS,
 )
-def test_bias_jac_t_mat_prod(problem, sum_batch, V=3):
+def test_bias_jac_t_mat_prod(problem, sum_batch, subsampling, V=3):
     """Test the transposed Jacobian-matrix product w.r.t. to the biass.
 
     Args:
         problem (DerivativesProblem): Problem for derivative test.
         sum_batch (bool): Sum results over the batch dimension.
+        subsampling ([int]): Sample indices for which the transposed Jacobian
+            is applied. If ``None``, apply to all samples in mini-batch.
         V (int): Number of vectorized transposed Jacobian-vector products.
     """
     problem.set_up()
-    mat = torch.rand(V, *problem.output_shape).to(problem.device)
 
-    backpack_res = BackpackDerivatives(problem).bias_jac_t_mat_prod(mat, sum_batch)
-    autograd_res = AutogradDerivatives(problem).bias_jac_t_mat_prod(mat, sum_batch)
+    mat = rand_mat_like_output(V, problem.output_shape, subsampling=subsampling).to(
+        problem.device
+    )
+
+    backpack_res = BackpackDerivatives(problem).bias_jac_t_mat_prod(
+        mat, sum_batch, subsampling=subsampling
+    )
+    autograd_res = AutogradDerivatives(problem).bias_jac_t_mat_prod(
+        mat, sum_batch, subsampling=subsampling
+    )
 
     check_sizes_and_values(autograd_res, backpack_res)
     problem.tear_down()
@@ -243,6 +288,7 @@ def test_weight_jac_mat_prod_should_fail(problem):
         test_weight_jac_mat_prod(problem)
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize(
     "sum_batch", [True, False], ids=["sum_batch=True", "sum_batch=False"]
 )
@@ -254,9 +300,13 @@ def test_weight_jac_mat_prod_should_fail(problem):
 @pytest.mark.parametrize(
     "problem", CONVOLUTION_TRANSPOSED_FAIL_PROBLEMS, ids=CONVOLUTION_TRANSPOSED_FAIL_IDS
 )
-def test_weight_jac_t_mat_prod_should_fail(problem, sum_batch, save_memory):
+def test_weight_jac_t_mat_prod_should_fail(
+    problem, sum_batch, save_memory, subsampling
+):
     with pytest.raises(NotImplementedError):
-        test_weight_jac_t_mat_prod(problem, sum_batch, save_memory)
+        test_weight_jac_t_mat_prod(
+            problem, sum_batch, save_memory, subsampling=subsampling
+        )
 
 
 @pytest.mark.parametrize("problem", LOSS_FAIL_PROBLEMS, ids=LOSS_FAIL_IDS)

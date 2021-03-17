@@ -34,37 +34,46 @@ class AutogradDerivatives(DerivativesImplementation):
 
         return torch.stack(jac_t_vec_prods)
 
-    def weight_jac_t_mat_prod(self, mat, sum_batch):
-        return self.param_jac_t_mat_prod("weight", mat, sum_batch)
+    def weight_jac_t_mat_prod(self, mat, sum_batch, subsampling=None):
+        return self.param_jac_t_mat_prod(
+            "weight", mat, sum_batch, subsampling=subsampling
+        )
 
-    def bias_jac_t_mat_prod(self, mat, sum_batch):
-        return self.param_jac_t_mat_prod("bias", mat, sum_batch)
+    def bias_jac_t_mat_prod(self, mat, sum_batch, subsampling=None):
+        return self.param_jac_t_mat_prod(
+            "bias", mat, sum_batch, subsampling=subsampling
+        )
 
-    def param_jac_t_vec_prod(self, name, vec, sum_batch):
+    def param_jac_t_vec_prod(self, name, vec, sum_batch, subsampling=None):
         input, output, named_params = self.problem.forward_pass()
         param = named_params[name]
 
+        N_axis = 0
+        samples = range(input.shape[N_axis]) if subsampling is None else subsampling
+        sample_outputs = [output[n] for n in samples]
+        sample_vecs = [vec[n] for n in samples]
+
+        jac_t_sample_prods = []
+        for n, (n_out, n_vec) in enumerate(zip(sample_outputs, sample_vecs)):
+            if n in samples:
+                jac_t_sample_prods.append(
+                    transposed_jacobian_vector_product(n_out, param, n_vec)[0]
+                )
+
+        jac_t_sample_prods = torch.stack(jac_t_sample_prods)
+
         if sum_batch:
-            return transposed_jacobian_vector_product(output, param, vec)[0]
-        else:
-            N = input.shape[0]
+            jac_t_sample_prods = jac_t_sample_prods.sum(N_axis)
 
-            sample_outputs = [output[n] for n in range(N)]
-            sample_vecs = [vec[n] for n in range(N)]
+        return jac_t_sample_prods
 
-            jac_t_sample_prods = [
-                transposed_jacobian_vector_product(n_out, param, n_vec)[0]
-                for n_out, n_vec in zip(sample_outputs, sample_vecs)
-            ]
-
-            return torch.stack(jac_t_sample_prods)
-
-    def param_jac_t_mat_prod(self, name, mat, sum_batch):
+    def param_jac_t_mat_prod(self, name, mat, sum_batch, subsampling=None):
         V = mat.shape[0]
 
         vecs = [mat[v] for v in range(V)]
         jac_t_vec_prods = [
-            self.param_jac_t_vec_prod(name, vec, sum_batch) for vec in vecs
+            self.param_jac_t_vec_prod(name, vec, sum_batch, subsampling=subsampling)
+            for vec in vecs
         ]
 
         return torch.stack(jac_t_vec_prods)

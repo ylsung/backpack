@@ -10,10 +10,10 @@ class DerivativesImplementation:
     def jac_t_mat_prod(self, mat):
         raise NotImplementedError
 
-    def weight_jac_t_mat_prod(self, mat, sum_batch):
+    def weight_jac_t_mat_prod(self, mat, sum_batch, subsampling=None):
         raise NotImplementedError
 
-    def bias_jac_t_mat_prod(self, mat, sum_batch):
+    def bias_jac_t_mat_prod(self, mat, sum_batch, subsampling=None):
         raise NotImplementedError
 
     def weight_jac_mat_prod(self, mat):
