@@ -62,8 +62,8 @@ class BackpackExtensions(ExtensionsImplementation):
             variances = [p.variance for p in self.problem.model.parameters()]
         return variances
 
-    def diag_ggn(self):
-        with backpack(new_ext.DiagGGNExact()):
+    def diag_ggn(self, subsampling=None):
+        with backpack(new_ext.DiagGGNExact(subsampling=subsampling)):
             _, _, loss = self.problem.forward_pass()
             loss.backward()
             diag_ggn = [p.diag_ggn_exact for p in self.problem.model.parameters()]
@@ -78,14 +78,16 @@ class BackpackExtensions(ExtensionsImplementation):
             ]
         return diag_ggn_exact_batch
 
-    def diag_ggn_mc(self, mc_samples):
-        with backpack(new_ext.DiagGGNMC(mc_samples=mc_samples)):
+    def diag_ggn_mc(self, mc_samples, subsampling=None):
+        with backpack(
+            new_ext.DiagGGNMC(mc_samples=mc_samples, subsampling=subsampling)
+        ):
             _, _, loss = self.problem.forward_pass()
             loss.backward()
             diag_ggn_mc = [p.diag_ggn_mc for p in self.problem.model.parameters()]
         return diag_ggn_mc
 
-    def diag_ggn_mc_chunk(self, mc_samples, chunks=10):
+    def diag_ggn_mc_chunk(self, mc_samples, chunks=10, subsampling=None):
         """Like ``diag_ggn_mc``, but handles larger number of samples by chunking."""
         chunk_samples = (chunks - 1) * [mc_samples // chunks]
         last_samples = mc_samples - sum(chunk_samples)
@@ -97,7 +99,7 @@ class BackpackExtensions(ExtensionsImplementation):
         diag_ggn_mc = None
 
         for weight, samples in zip(chunk_weights, chunk_samples):
-            chunk_diag_ggn_mc = self.diag_ggn_mc(samples)
+            chunk_diag_ggn_mc = self.diag_ggn_mc(samples, subsampling=subsampling)
             chunk_diag_ggn_mc = [diag_mc * weight for diag_mc in chunk_diag_ggn_mc]
 
             if diag_ggn_mc is None:

@@ -70,43 +70,58 @@ class AutogradExtensions(ExtensionsImplementation):
         variances = [torch.var(g, dim=0, unbiased=False) for g in batch_grad]
         return variances
 
-    def _get_diag_ggn(self, loss, output):
-        def extract_ith_element_of_diag_ggn(i, p, loss, output):
-            v = torch.zeros(p.numel()).to(self.problem.device)
-            v[i] = 1.0
-            vs = vector_to_parameter_list(v, [p])
-            GGN_vs = ggn_vector_product_from_plist(loss, output, [p], vs)
-            GGN_v = torch.cat([g.detach().view(-1) for g in GGN_vs])
-            return GGN_v[i]
+    def _get_diag_ggn(self, loss, output, subsampling=None):
+        if subsampling is None:
 
-        diag_ggns = []
-        for p in list(self.problem.model.parameters()):
-            diag_ggn_p = torch.zeros_like(p).view(-1)
+            def extract_ith_element_of_diag_ggn(i, p, loss, output):
+                v = torch.zeros(p.numel()).to(self.problem.device)
+                v[i] = 1.0
+                vs = vector_to_parameter_list(v, [p])
+                GGN_vs = ggn_vector_product_from_plist(loss, output, [p], vs)
+                GGN_v = torch.cat([g.detach().view(-1) for g in GGN_vs])
+                return GGN_v[i]
 
-            for parameter_index in range(p.numel()):
-                diag_value = extract_ith_element_of_diag_ggn(
-                    parameter_index, p, loss, output
-                )
-                diag_ggn_p[parameter_index] = diag_value
+            diag_ggns = []
+            for p in list(self.problem.model.parameters()):
+                diag_ggn_p = torch.zeros_like(p).view(-1)
 
-            diag_ggns.append(diag_ggn_p.view(p.size()))
-        return diag_ggns
+                for parameter_index in range(p.numel()):
+                    diag_value = extract_ith_element_of_diag_ggn(
+                        parameter_index, p, loss, output
+                    )
+                    diag_ggn_p[parameter_index] = diag_value
 
-    def diag_ggn(self):
+                diag_ggns.append(diag_ggn_p.view(p.size()))
+            return diag_ggns
+
+        else:
+            diag_ggn_batch = self.diag_ggn_batch(subsampling=subsampling)
+            N_axis = 0
+            return [d.sum(N_axis) for d in diag_ggn_batch]
+
+    def diag_ggn(self, subsampling=None):
         _, output, loss = self.problem.forward_pass()
-        return self._get_diag_ggn(loss, output)
+        return self._get_diag_ggn(loss, output, subsampling=subsampling)
 
-    def diag_ggn_batch(self):
+    def diag_ggn_batch(self, subsampling=None):
         batch_size = self.problem.input.shape[0]
+        # for determining the scaling factor stemming from reduction in the loss
         _, _, batch_loss = self.problem.forward_pass()
         loss_list = torch.zeros(batch_size, device=self.problem.device)
 
+        if subsampling is None:
+            subsampling = list(range(batch_size))
+
         # batch_diag_ggn has entries [sample_idx][param_idx]
-        batch_diag_ggn = []
+        batch_diag_ggn = [None for _ in range(len(subsampling))]
         for b in range(batch_size):
             _, output, loss = self.problem.forward_pass(sample_idx=b)
-            diag_ggn = self._get_diag_ggn(loss, output)
-            batch_diag_ggn.append(diag_ggn)
+
+            if b in subsampling:
+                sample_idx = subsampling.index(b)
+                diag_ggn = self._get_diag_ggn(loss, output)
+                batch_diag_ggn[sample_idx] = diag_ggn
+
             loss_list[b] = loss
         factor = self.problem.get_reduction_factor(batch_loss, loss_list)
         # params_batch_diag_ggn has entries [param_idx][sample_idx]

@@ -16,11 +16,21 @@ class DiagGGNLoss(DiagGGNBaseModule):
         """Get function that produces the backpropagated quantity."""
         loss_hessian_strategy = ext.loss_hessian_strategy
 
+        # TODO Remove after all exts. based on DiagGGNBaseModule support subsampling
+        try:
+            subsampling = ext.get_subsampling()
+        except AttributeError:
+            subsampling = None
+
         if loss_hessian_strategy == LossHessianStrategy.EXACT:
-            return self.derivatives.sqrt_hessian
+            return partial(self.derivatives.sqrt_hessian, subsampling=subsampling)
         elif loss_hessian_strategy == LossHessianStrategy.SAMPLING:
             mc_samples = ext.get_num_mc_samples()
-            return partial(self.derivatives.sqrt_hessian_sampled, mc_samples=mc_samples)
+            return partial(
+                self.derivatives.sqrt_hessian_sampled,
+                mc_samples=mc_samples,
+                subsampling=subsampling,
+            )
 
         else:
             raise ValueError(

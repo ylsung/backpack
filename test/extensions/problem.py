@@ -108,16 +108,26 @@ class ExtensionsTestProblem:
         )
 
     def forward_pass(self, sample_idx=None):
-        """Do a forward pass. Return input, output, and parameters."""
-        if sample_idx is None:
-            input = self.input.clone().detach()
-            target = self.target.clone().detach()
-        else:
-            input = self.input.clone()[sample_idx, :].unsqueeze(0).detach()
-            target = self.target.clone()[sample_idx].unsqueeze(0).detach()
+        """Do a forward pass. Return input, output, and loss.
 
-        print(self.target.shape)
-        print(target.shape)
+        Args:
+            sample_idx ([int], int or None): Indices of samples to use. ``None``
+                uses all samples. Integer denotes the index of a single sample, and
+                list of integers refers to a set of samples.
+
+        Returns:
+            (torch.Tensor, torch.Tensor, torch.Tensor): First tensor is the forward
+                passes' input, second tensor is the model output, i.e. the forward
+                passes' evaluation of the first tensor. Third tensor is the loss.
+        """
+        input = self.input.clone().detach()
+        target = self.target.clone().detach()
+
+        if sample_idx is not None:
+            idx = [sample_idx] if isinstance(sample_idx, int) else sample_idx
+            input = input[idx]
+            target = target[idx]
+
         output = self.model(input)
         loss = self.loss_function(output, target)
 

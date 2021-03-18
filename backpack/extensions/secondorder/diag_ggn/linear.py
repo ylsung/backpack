@@ -8,10 +8,18 @@ class DiagGGNLinear(DiagGGNBaseModule):
         super().__init__(derivatives=LinearDerivatives(), params=["bias", "weight"])
 
     def bias(self, ext, module, grad_inp, grad_out, backproped):
-        return LinUtils.extract_bias_diagonal(module, backproped, sum_batch=True)
+        subsampling = ext.get_subsampling()
+
+        return LinUtils.extract_bias_diagonal(
+            module, backproped, sum_batch=True, subsampling=subsampling
+        )
 
     def weight(self, ext, module, grad_inp, grad_out, backproped):
-        return LinUtils.extract_weight_diagonal(module, backproped, sum_batch=True)
+        subsampling = ext.get_subsampling()
+
+        return LinUtils.extract_weight_diagonal(
+            module, backproped, sum_batch=True, subsampling=subsampling
+        )
 
 
 class BatchDiagGGNLinear(DiagGGNBaseModule):

@@ -10,17 +10,26 @@ PROBLEMS = make_test_problems(DiagGGN_SETTINGS)
 IDS = [problem.make_id() for problem in PROBLEMS]
 
 
+SUBSAMPLINGS = [None, [0]]
+SUBSAMPLINGS_IDS = [f"subsampling={subsampling}" for subsampling in SUBSAMPLINGS]
+
+
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", PROBLEMS, ids=IDS)
-def test_diag_ggn(problem):
-    """Test the diagonal of Gauss-Newton
+def test_diag_ggn(problem, subsampling):
+    """Test the diagonal of Gauss-Newton.
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
+        subsampling ([int], optional): Indices of samples in
+            the mini-batch for which the GGN/Fisher diagonal
+            should be computed and summed. Default value ``None``
+            uses the entire mini-batch.
     """
     problem.set_up()
 
-    backpack_res = BackpackExtensions(problem).diag_ggn()
-    autograd_res = AutogradExtensions(problem).diag_ggn()
+    backpack_res = BackpackExtensions(problem).diag_ggn(subsampling=subsampling)
+    autograd_res = AutogradExtensions(problem).diag_ggn(subsampling=subsampling)
 
     check_sizes_and_values(autograd_res, backpack_res)
     problem.tear_down()
@@ -47,19 +56,25 @@ MC_LIGHT_RTOL = 1e-1
 MC_RTOL = 1e-2
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", PROBLEMS, ids=IDS)
-def test_diag_ggn_mc_light(problem):
-    """Test the MC approximation of Diagonal of Gauss-Newton
-        with few mc_samples (light version)
+def test_diag_ggn_mc_light(problem, subsampling):
+    """Test the MC approximation of Diagonal of Gauss-Newton with few samples.
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
+        subsampling ([int], optional): Indices of samples in
+            the mini-batch for which the MC-approximated GGN/Fisher
+            diagonal should be computed and summed. Default value
+            ``None`` uses the entire mini-batch.
     """
     problem.set_up()
 
-    backpack_res = BackpackExtensions(problem).diag_ggn()
+    backpack_res = BackpackExtensions(problem).diag_ggn(subsampling=subsampling)
     mc_samples = 3000
-    backpack_res_mc_avg = BackpackExtensions(problem).diag_ggn_mc(mc_samples)
+    backpack_res_mc_avg = BackpackExtensions(problem).diag_ggn_mc(
+        mc_samples, subsampling=subsampling
+    )
 
     check_sizes_and_values(
         backpack_res, backpack_res_mc_avg, atol=MC_ATOL, rtol=MC_LIGHT_RTOL
@@ -68,21 +83,25 @@ def test_diag_ggn_mc_light(problem):
 
 
 @pytest.mark.montecarlo
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", PROBLEMS, ids=IDS)
-def test_diag_ggn_mc(problem):
-    """Test the MC approximation of Diagonal of Gauss-Newton
-       with more samples (slow version)
+def test_diag_ggn_mc(problem, subsampling):
+    """Test the MC approximation of Diagonal of Gauss-Newton with many samples.
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
+        subsampling ([int], optional): Indices of samples in
+            the mini-batch for which the MC-approximated GGN/Fisher
+            diagonal should be computed and summed. Default value
+            ``None`` uses the entire mini-batch.
     """
     problem.set_up()
 
-    backpack_res = BackpackExtensions(problem).diag_ggn()
+    backpack_res = BackpackExtensions(problem).diag_ggn(subsampling=subsampling)
     mc_samples = 300000
     chunks = 30
     backpack_res_mc_avg = BackpackExtensions(problem).diag_ggn_mc_chunk(
-        mc_samples, chunks=chunks
+        mc_samples, chunks=chunks, subsampling=subsampling
     )
 
     check_sizes_and_values(
