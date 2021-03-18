@@ -21,9 +21,9 @@ def test_diag_ggn(problem, subsampling):
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
-        subsampling ([int], optional): Indices of samples in
+        subsampling ([int]): Indices of samples in
             the mini-batch for which the GGN/Fisher diagonal
-            should be computed and summed. Default value ``None``
+            should be computed and summed. ``None``
             uses the entire mini-batch.
     """
     problem.set_up()
@@ -35,17 +35,23 @@ def test_diag_ggn(problem, subsampling):
     problem.tear_down()
 
 
+@pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
 @pytest.mark.parametrize("problem", PROBLEMS, ids=IDS)
-def test_diag_ggn_batch(problem):
+def test_diag_ggn_batch(problem, subsampling):
     """Test the individual diagonal of Generalized Gauss-Newton/Fisher
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
+        subsampling ([int]): Indices of samples in
+            the mini-batch for which the GGN/Fisher diagonal should be
+            computed. ``None`` uses the entire mini-batch.
     """
     problem.set_up()
 
-    backpack_res = BackpackExtensions(problem).diag_ggn_exact_batch()
-    autograd_res = AutogradExtensions(problem).diag_ggn_batch()
+    backpack_res = BackpackExtensions(problem).diag_ggn_exact_batch(
+        subsampling=subsampling
+    )
+    autograd_res = AutogradExtensions(problem).diag_ggn_batch(subsampling=subsampling)
 
     check_sizes_and_values(autograd_res, backpack_res)
     problem.tear_down()
@@ -63,9 +69,9 @@ def test_diag_ggn_mc_light(problem, subsampling):
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
-        subsampling ([int], optional): Indices of samples in
+        subsampling ([int]): Indices of samples in
             the mini-batch for which the MC-approximated GGN/Fisher
-            diagonal should be computed and summed. Default value
+            diagonal should be computed and summed.
             ``None`` uses the entire mini-batch.
     """
     problem.set_up()
@@ -90,9 +96,9 @@ def test_diag_ggn_mc(problem, subsampling):
 
     Args:
         problem (ExtensionsTestProblem): Problem for extension test.
-        subsampling ([int], optional): Indices of samples in
+        subsampling ([int]): Indices of samples in
             the mini-batch for which the MC-approximated GGN/Fisher
-            diagonal should be computed and summed. Default value
+            diagonal should be computed and summed.
             ``None`` uses the entire mini-batch.
     """
     problem.set_up()

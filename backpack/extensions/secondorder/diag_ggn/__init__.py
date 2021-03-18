@@ -171,7 +171,7 @@ class BatchDiagGGN(BackpropExtension):
         LossHessianStrategy.SAMPLING,
     ]
 
-    def __init__(self, loss_hessian_strategy, savefield):
+    def __init__(self, loss_hessian_strategy, savefield, subsampling):
         if loss_hessian_strategy not in self.VALID_LOSS_HESSIAN_STRATEGIES:
             raise ValueError(
                 "Unknown hessian strategy: {}".format(loss_hessian_strategy)
@@ -209,6 +209,11 @@ class BatchDiagGGN(BackpropExtension):
                 SELU: activations.DiagGGNSELU(),
             },
         )
+        self._subsampling = subsampling
+
+    def get_subsampling(self):
+        """Return the indices of samples whose GGN/Fisher diagonals are evaluated."""
+        return self._subsampling
 
 
 class BatchDiagGGNExact(BatchDiagGGN):
@@ -217,11 +222,19 @@ class BatchDiagGGNExact(BatchDiagGGN):
     Uses the exact Hessian of the loss w.r.t. the model output.
 
     Stores the output in ``diag_ggn_exact_batch`` as a ``[N x ...]`` tensor,
-    where ``N`` is the batch size and ``...`` is the shape of the gradient.
+    where ``N`` is the mini-batch (or subset) size and ``...`` is the shape
+    of the gradient.
+
+    Args:
+        subsampling ([int], optional): Indices of samples in
+            the mini-batch for which the individual GGN/Fisher diagonal
+            should be computed. Default value ``None`` uses the entire
+            mini-batch.
     """
 
-    def __init__(self):
+    def __init__(self, subsampling=None):
         super().__init__(
             loss_hessian_strategy=LossHessianStrategy.EXACT,
             savefield="diag_ggn_exact_batch",
+            subsampling=subsampling,
         )

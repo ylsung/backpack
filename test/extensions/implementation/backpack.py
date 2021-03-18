@@ -69,8 +69,8 @@ class BackpackExtensions(ExtensionsImplementation):
             diag_ggn = [p.diag_ggn_exact for p in self.problem.model.parameters()]
         return diag_ggn
 
-    def diag_ggn_exact_batch(self):
-        with backpack(new_ext.BatchDiagGGNExact()):
+    def diag_ggn_exact_batch(self, subsampling=None):
+        with backpack(new_ext.BatchDiagGGNExact(subsampling=subsampling)):
             _, _, loss = self.problem.forward_pass()
             loss.backward()
             diag_ggn_exact_batch = [

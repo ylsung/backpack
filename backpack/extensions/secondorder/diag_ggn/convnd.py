@@ -40,10 +40,13 @@ class BatchDiagGGNConvND(DiagGGNBaseModule):
         )
 
     def weight(self, ext, module, grad_inp, grad_out, backproped):
+        subsampling = ext.get_subsampling()
+        input = subsample_input(module, subsampling=subsampling)
+
         if self.N == 2:
-            X = convUtils.unfold_func(module)(module.input0)
+            X = convUtils.unfold_func(module)(input)
         else:
-            X = convUtils.unfold_by_conv(module.input0, module)
+            X = convUtils.unfold_by_conv(input, module)
         weight_diag = convUtils.extract_weight_diagonal(
             module, X, backproped, self.N, sum_batch=False
         )
