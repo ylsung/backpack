@@ -11,31 +11,26 @@ class AutogradExtensions(ExtensionsImplementation):
     """Extension implementations with autograd."""
 
     def batch_grad(self, subsampling=None):
-        N = self.problem.input.shape[0]
-        batch_grads = [
-            torch.zeros(N, *p.size()).to(self.problem.device)
+        batch_size = self.problem.input.shape[0]
+
+        if subsampling is None:
+            subsampling = list(range(batch_size))
+
+        batch_grad = [
+            torch.zeros(len(subsampling), *p.size()).to(self.problem.device)
             for p in self.problem.model.parameters()
         ]
+        factor = self.problem.compute_reduction_factor()
 
-        loss_list = torch.zeros((N))
-        gradients_list = []
-        for b in range(N):
-            _, _, loss = self.problem.forward_pass(sample_idx=b)
-            gradients = torch.autograd.grad(loss, self.problem.model.parameters())
-            gradients_list.append(gradients)
-            loss_list[b] = loss
+        for out_idx, n in enumerate(subsampling):
+            _, _, loss_n = self.problem.forward_pass(sample_idx=n)
+            loss_n *= factor
+            grad_n = torch.autograd.grad(loss_n, self.problem.model.parameters())
 
-        _, _, batch_loss = self.problem.forward_pass()
-        factor = self.problem.get_reduction_factor(batch_loss, loss_list)
+            for param_idx, g_n in enumerate(grad_n):
+                batch_grad[param_idx][out_idx] = g_n.detach()
 
-        for b, gradients in zip(range(N), gradients_list):
-            for idx, g in enumerate(gradients):
-                batch_grads[idx][b, :] = g.detach() * factor
-
-        if subsampling is not None:
-            batch_grads = [bg[subsampling] for bg in batch_grads]
-
-        return batch_grads
+        return batch_grad
 
     def batch_l2_grad(self):
         batch_grad = self.batch_grad()
@@ -43,26 +38,21 @@ class AutogradExtensions(ExtensionsImplementation):
         return batch_l2_grads
 
     def sgs(self):
-        N = self.problem.input.shape[0]
+        factor = self.problem.compute_reduction_factor()
         sgs = [
             torch.zeros(*p.size()).to(self.problem.device)
             for p in self.problem.model.parameters()
         ]
 
-        loss_list = torch.zeros((N))
-        gradients_list = []
+        N = self.problem.input.shape[0]
         for b in range(N):
-            _, _, loss = self.problem.forward_pass(sample_idx=b)
-            gradients = torch.autograd.grad(loss, self.problem.model.parameters())
-            loss_list[b] = loss
-            gradients_list.append(gradients)
+            _, _, loss_b = self.problem.forward_pass(sample_idx=b)
+            loss_b *= factor
+            grad_b = torch.autograd.grad(loss_b, self.problem.model.parameters())
 
-        _, _, batch_loss = self.problem.forward_pass()
-        factor = self.problem.get_reduction_factor(batch_loss, loss_list)
+            for param_idx, g_b in enumerate(grad_b):
+                sgs[param_idx] += g_b.detach() ** 2
 
-        for _, gradients in zip(range(N), gradients_list):
-            for idx, g in enumerate(gradients):
-                sgs[idx] += (g.detach() * factor) ** 2
         return sgs
 
     def variance(self):
@@ -105,28 +95,24 @@ class AutogradExtensions(ExtensionsImplementation):
 
     def diag_ggn_batch(self, subsampling=None):
         batch_size = self.problem.input.shape[0]
-        # for determining the scaling factor stemming from reduction in the loss
-        _, _, batch_loss = self.problem.forward_pass()
-        loss_list = torch.zeros(batch_size, device=self.problem.device)
+        factor = self.problem.compute_reduction_factor()
 
         if subsampling is None:
             subsampling = list(range(batch_size))
 
         # batch_diag_ggn has entries [sample_idx][param_idx]
         batch_diag_ggn = [None for _ in range(len(subsampling))]
-        for b in range(batch_size):
-            _, output, loss = self.problem.forward_pass(sample_idx=b)
 
-            if b in subsampling:
-                sample_idx = subsampling.index(b)
-                diag_ggn = self._get_diag_ggn(loss, output)
-                batch_diag_ggn[sample_idx] = diag_ggn
+        for out_idx, n in enumerate(subsampling):
+            _, output_n, loss_n = self.problem.forward_pass(sample_idx=n)
+            loss_n *= factor
+            diag_ggn_n = self._get_diag_ggn(loss_n, output_n)
+            batch_diag_ggn[out_idx] = diag_ggn_n
 
-            loss_list[b] = loss
-        factor = self.problem.get_reduction_factor(batch_loss, loss_list)
-        # params_batch_diag_ggn has entries [param_idx][sample_idx]
-        params_batch_diag_ggn = list(zip(*batch_diag_ggn))
-        return [torch.stack(param) * factor for param in params_batch_diag_ggn]
+        # rearrange to [param_idx][sample_idx]
+        batch_diag_ggn = list(zip(*batch_diag_ggn))
+
+        return [torch.stack(p_batch_diag_ggn) for p_batch_diag_ggn in batch_diag_ggn]
 
     def diag_h(self):
         _, _, loss = self.problem.forward_pass()

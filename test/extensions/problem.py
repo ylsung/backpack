@@ -137,7 +137,8 @@ class ExtensionsTestProblem:
         self.model = extend(self.model)
         self.loss_function = extend(self.loss_function)
 
-    def get_reduction_factor(self, loss, unreduced_loss):
+    @staticmethod
+    def get_reduction_factor(loss, unreduced_loss):
         """Return the factor used to reduce the individual losses."""
         mean_loss = unreduced_loss.flatten().mean()
         sum_loss = unreduced_loss.flatten().sum()
@@ -157,3 +158,24 @@ class ExtensionsTestProblem:
                 f"'mean': {mean_loss}, 'sum': {sum_loss}, loss: {loss}",
             )
         return factor
+
+    def compute_reduction_factor(self):
+        """Compute and return the loss function's reduction factor in batch mode.
+
+        For instance, if ``reduction='mean'`` is used, then the reduction factor
+        is ``1 / N`` where ``N`` is the batch size. With ``reduction='sum'``, it
+        is ``1``.
+
+        Returns:
+            float: Reduction factor
+        """
+        _, _, loss = self.forward_pass()
+
+        batch_size = self.input.shape[0]
+        loss_list = torch.zeros(batch_size, device=self.device)
+
+        for n in range(batch_size):
+            _, _, loss_n = self.forward_pass(sample_idx=n)
+            loss_list[n] = loss_n
+
+        return self.get_reduction_factor(loss, loss_list)
