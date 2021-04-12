@@ -103,12 +103,32 @@ class LinearDerivatives(BaseParameterDerivatives):
     def _bias_jac_t_mat_prod(
         self, module, g_inp, g_out, mat, sum_batch=True, subsampling=None
     ):
-        """Apply transposed Jacobian of the output w.r.t. the bias."""
-        if sum_batch:
-            N_axis = 1
-            return mat.sum(N_axis)
-        else:
-            return mat
+        """Batch-apply transposed Jacobian of the output w.r.t. the bias.
+
+        Args:
+            module (torch.nn.Linear): Linear layer.
+            g_inp ((torch.Tensor)): Tuple of gradients w.r.t. layer inputs.
+            g_out ((torch.Tensor)): Tuple of gradients w.r.t. layer outputs.
+            mat (torch.Tensor): Batch of ``V`` vectors, shaped as the layer outputs
+                (``[batch_size, *, out_features]``), onto which the transposed
+                output-weight Jacobian will be applied. Has shape
+                ``[V, batch_size, *, out_features]``. If sub-sampling is used,
+                the second axis must have dimension ``len(subsampling)``.
+            sum_batch (bool, optional): Sum out the result's batch axis.
+                Default: ``True``.
+            subsampling ([int] or None, optional): Indices of samples to be considered
+                from the mini-batch. Default: ``None`` (uses all samples).
+
+        Returns:
+            torch.Tensor: Batched transposed Jacobian vector products. Has shape
+                ``[V, batch_size, out_features]`` when ``sum_batch`` is ``False``.
+                If sub-sampling is used, the second axis has dimension
+                ``len(subsampling)``. With ``sum_batch=True``, the shape is
+                ``[V, out_features]`` irrespective of sub-sampling.
+        """
+        contract = "vn...o->vo" if sum_batch else "vn...o->vno"
+
+        return einsum(contract, mat)
 
     def _has_additional_dims(self, module):
         """Return whether the input to a linear layer has additional (>1) dimensions.

@@ -224,8 +224,8 @@ for problem, problem_id in zip(PROBLEMS, IDS):
 )
 @pytest.mark.parametrize(
     "problem",
-    PROBLEMS_WITH_BIAS,
-    ids=IDS_WITH_BIAS,
+    PROBLEMS_WITH_BIAS + LINEAR_ADDITIONAL_DIMS_PROBLEMS,
+    ids=IDS_WITH_BIAS + LINEAR_ADDITIONAL_DIMS_IDS,
 )
 def test_bias_jac_t_mat_prod(problem, sum_batch, subsampling, V=3):
     """Test the transposed Jacobian-matrix product w.r.t. to the biass.
@@ -234,8 +234,9 @@ def test_bias_jac_t_mat_prod(problem, sum_batch, subsampling, V=3):
         problem (DerivativesProblem): Problem for derivative test.
         sum_batch (bool): Sum results over the batch dimension.
         subsampling ([int]): Sample indices for which the transposed Jacobian
-            is applied. If ``None``, apply to all samples in mini-batch.
-        V (int): Number of vectorized transposed Jacobian-vector products.
+            is applied. If ``None``, use all samples in mini-batch.
+        V (int, optional): Number of vectorized transposed Jacobian-vector products.
+            Default: ``3``.
     """
     problem.set_up()
 
