@@ -19,9 +19,28 @@ class LinearDerivatives(BaseParameterDerivatives):
         return True
 
     def _jac_t_mat_prod(self, module, g_inp, g_out, mat, subsampling=None):
-        """Apply transposed Jacobian of the output w.r.t. the input."""
+        """Batch-apply transposed Jacobian of the output w.r.t. the input.
+
+        Args:
+            module (torch.nn.Linear): Linear layer.
+            g_inp ((torch.Tensor)): Tuple of gradients w.r.t. layer inputs.
+            g_out ((torch.Tensor)): Tuple of gradients w.r.t. layer outputs.
+            mat (torch.Tensor): Batch of ``V`` vectors, shaped as the layer outputs
+                (``[batch_size, *, out_features]``), onto which the transposed
+                output-input Jacobian will be applied. Has shape
+                ``[V, batch_size, *, out_features]``. If sub-sampling is used,
+                the second axis must have dimension ``len(subsampling)``.
+            subsampling ([int] or None): Indices of samples to be considered from
+                the mini-batch. Default: ``None`` (uses all samples).
+
+        Returns:
+            torch.Tensor: Batched transposed Jacobian vector products. Has shape
+                ``[V, batch_size, *, in_features]``. If sub-sampling is used,
+                the second axis has dimension ``len(subsampling)``.
+        """
         d_input = module.weight.data
-        return einsum("oi,vno->vni", (d_input, mat))
+
+        return einsum("oi,vn...o->vn...i", (d_input, mat))
 
     def _jac_mat_prod(self, module, g_inp, g_out, mat):
         """Apply Jacobian of the output w.r.t. the input."""

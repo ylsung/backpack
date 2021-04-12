@@ -14,6 +14,7 @@ from test.core.derivatives.convolution_settings import (
 )
 from test.core.derivatives.implementation.autograd import AutogradDerivatives
 from test.core.derivatives.implementation.backpack import BackpackDerivatives
+from test.core.derivatives.linear_settings import LINEAR_ADDITIONAL_DIMS_SETTINGS
 from test.core.derivatives.loss_settings import LOSS_FAIL_SETTINGS
 from test.core.derivatives.problem import make_test_problems
 from test.core.derivatives.settings import SETTINGS
@@ -48,6 +49,11 @@ CONVOLUTION_TRANSPOSED_FAIL_IDS = [
 
 SUBSAMPLINGS = [None, [0]]
 SUBSAMPLINGS_IDS = [f"subsampling={subsampling}" for subsampling in SUBSAMPLINGS]
+
+LINEAR_ADDITIONAL_DIMS_PROBLEMS = make_test_problems(LINEAR_ADDITIONAL_DIMS_SETTINGS)
+LINEAR_ADDITIONAL_DIMS_IDS = [
+    problem.make_id() for problem in LINEAR_ADDITIONAL_DIMS_PROBLEMS
+]
 
 
 def rand_mat_like_output(V, output_shape, subsampling=None):
@@ -92,14 +98,18 @@ def test_jac_mat_prod(problem, V=3):
 
 
 @pytest.mark.parametrize("subsampling", SUBSAMPLINGS, ids=SUBSAMPLINGS_IDS)
-@pytest.mark.parametrize("problem", NO_LOSS_PROBLEMS, ids=NO_LOSS_IDS)
+@pytest.mark.parametrize(
+    "problem",
+    NO_LOSS_PROBLEMS + LINEAR_ADDITIONAL_DIMS_PROBLEMS,
+    ids=NO_LOSS_IDS + LINEAR_ADDITIONAL_DIMS_IDS,
+)
 def test_jac_t_mat_prod(problem, subsampling, V=3):
     """Test the transposed Jacobian-matrix product.
 
     Args:
         problem (DerivativesProblem): Problem for derivative test.
-        V (int): Number of vectorized transposed Jacobian-vector products.
         subsampling ([int] or None): Indices of samples used by sub-sampling.
+        V (int): Number of vectorized transposed Jacobian-vector products.
     """
     problem.set_up()
 
