@@ -55,8 +55,8 @@ class AutogradDerivatives(DerivativesImplementation):
 
         N_axis = 0
         samples = range(input.shape[N_axis]) if subsampling is None else subsampling
-        sample_outputs = [output[n] for n in samples]
-        sample_vecs = [vec[n] for n in samples]
+        sample_outputs = [output[[n]] for n in samples]
+        sample_vecs = [vec[[n]] for n in samples]
 
         jac_t_sample_prods = []
         for n, (n_out, n_vec) in enumerate(zip(sample_outputs, sample_vecs)):
