@@ -147,19 +147,20 @@ for problem, problem_id in zip(PROBLEMS, IDS):
 )
 @pytest.mark.parametrize(
     "problem",
-    PROBLEMS_WITH_WEIGHTS,
-    ids=IDS_WITH_WEIGHTS,
+    PROBLEMS_WITH_WEIGHTS + LINEAR_ADDITIONAL_DIMS_PROBLEMS,
+    ids=IDS_WITH_WEIGHTS + LINEAR_ADDITIONAL_DIMS_IDS,
 )
 def test_weight_jac_t_mat_prod(problem, sum_batch, save_memory, subsampling, V=3):
-    """Test the transposed Jacobian-matrix product w.r.t. to the weights.
+    """Test transposed Jacobian matrix product of the output w.r.t. to the weight.
 
     Args:
         problem (DerivativesProblem): Problem for derivative test.
         sum_batch (bool): Sum results over the batch dimension.
-        save_memory (bool): Use Owkin implementation to save memory.
+        save_memory (bool): Use Owkin implementation in convolutions to save memory.
         subsampling ([int] or None): Sample indices for which the transposed Jacobian
-            is applied. If ``None``, apply to all samples in mini-batch.
-        V (int): Number of vectorized transposed Jacobian-vector products.
+            is applied. If ``None``, use all samples in the mini-batch.
+        V (int, optional): Number of vectorized transposed Jacobian vector products.
+            Default: ``3``.
     """
     problem.set_up()
 
