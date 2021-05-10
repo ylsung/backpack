@@ -5,6 +5,12 @@ import torch
 
 from backpack.extensions.backprop_extension import BackpropExtension
 
+from transformers.modeling_outputs import (
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    BaseModelOutputWithPastAndCrossAttentions,
+    SequenceClassifierOutput,
+)
+
 from . import extensions
 from .context import CTX
 
@@ -84,7 +90,22 @@ def hook_store_io(module, input, output):
     """
     for i in range(len(input)):
         setattr(module, "input{}".format(i), input[i])
-    module.output = output
+
+    module._output = output
+
+    # if isinstance(output, list) or isinstance(output, tuple):
+    #     module._output = output[0]
+
+    # elif isinstance(output, torch.Tensor):
+    #     module._output = output
+    # elif isinstance(output, BaseModelOutputWithPoolingAndCrossAttentions):
+    #     module._output = output["pooler_output"]
+    # elif isinstance(output, BaseModelOutputWithPastAndCrossAttentions):
+    #     module._output = output["last_hidden_state"]
+    # elif isinstance(output, SequenceClassifierOutput):
+    #     module._output = output["logits"]
+    # else:
+    #     raise NotImplementedError
 
 
 def hook_store_shapes(module, input, output):
@@ -96,10 +117,28 @@ def hook_store_shapes(module, input, output):
         output: output tensor shape
     """
     for i in range(len(input)):
-        module.register_buffer(
-            "input{}_shape".format(i), torch.IntTensor([*input[i].size()])
-        )
-    module.register_buffer("output_shape", torch.IntTensor([*output.size()]))
+        try:
+            module.register_buffer(
+                "input{}_shape".format(i), torch.IntTensor([*input[i].size()])
+            )
+        except:
+            module.register_buffer(
+                "input{}_shape".format(i), None
+            )
+
+    # module.register_buffer("output_shape", torch.IntTensor([*output.size()]))
+    if isinstance(output, list) or isinstance(output, tuple):
+        module.register_buffer("output_shape", torch.IntTensor([*output[0].size()]))
+    elif isinstance(output, torch.Tensor):
+        module.register_buffer("output_shape", torch.IntTensor([*output.size()]))
+    elif isinstance(output, BaseModelOutputWithPoolingAndCrossAttentions):
+        module.register_buffer("output_shape", torch.IntTensor([*output["pooler_output"].size()]))
+    elif isinstance(output, BaseModelOutputWithPastAndCrossAttentions):
+        module.register_buffer("output_shape", torch.IntTensor([*output["last_hidden_state"].size()]))
+    elif isinstance(output, SequenceClassifierOutput):
+        module.register_buffer("output_shape", torch.IntTensor([*output["logits"].size()]))
+    else:
+        raise NotImplementedError
 
 
 def memory_cleanup(module):
@@ -107,8 +146,8 @@ def memory_cleanup(module):
 
     Deletes the attributes created by `hook_store_io` and `hook_store_shapes`.
     """
-    if hasattr(module, "output"):
-        delattr(module, "output")
+    if hasattr(module, "_output"):
+        delattr(module, "_output")
     if hasattr(module, "output_shape"):
         delattr(module, "output_shape")
     i = 0

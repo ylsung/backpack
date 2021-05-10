@@ -61,7 +61,7 @@ class ModuleExtension:
 
     def apply(self, ext, module, g_inp, g_out):
         inp = module.input0
-        out = module.output
+        out = module._output
 
         bpQuantities = self.__backproped_quantities(ext, out)
 

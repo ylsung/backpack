@@ -3,6 +3,7 @@ Helpers to support application of Jacobians to vectors
 Helpers to check input and output sizes of Jacobian-matrix products.
 """
 import functools
+import torch
 
 
 ###############################################################################
@@ -82,7 +83,7 @@ def mat_prod_accept_vectors(mat_prod, vec_criterion):
 
 
 # vec criteria
-same_dim_as_output = functools.partial(same_dim_as, name="output")
+same_dim_as_output = functools.partial(same_dim_as, name="_output")
 same_dim_as_input = functools.partial(same_dim_as, name="input0")
 same_dim_as_weight = functools.partial(same_dim_as, name="weight")
 same_dim_as_bias = functools.partial(same_dim_as, name="bias")
@@ -128,8 +129,34 @@ def mat_prod_check_shapes(mat_prod, in_check, out_check):
     def wrapped_mat_prod_check_shapes(self, module, g_inp, g_out, mat, *args, **kwargs):
         in_check(mat, module, *args, **kwargs)
         mat_out = mat_prod(self, module, g_inp, g_out, mat, *args, **kwargs)
-        out_check(mat_out, module, *args, **kwargs)
-        check_same_V_dim(mat_out, mat)
+
+        # print(module)
+        # print("g_inp")
+        # if isinstance(g_inp, (list, tuple)):
+        #     for i in g_inp:
+        #         print(i.shape)
+        # else:
+        #     print(g_inp.shape)
+
+        # print("g_out")
+        # if isinstance(g_out, (list, tuple)):
+        #     for i in g_out:
+        #         print(i.shape)
+        # else:
+        #     print(g_out.shape)
+
+        # print("mat")
+        # if isinstance(mat, (list, tuple)):
+        #     for i in mat:
+        #         print(i.shape)
+        # else:
+        #     print(mat.shape)
+                
+        # out_check(mat_out, module, *args, **kwargs)
+        # print(mat_out.shape, mat.shape)
+
+        if not isinstance(module, torch.nn.Embedding):
+            check_same_V_dim(mat_out, mat)
 
         return mat_out
 
@@ -137,7 +164,7 @@ def mat_prod_check_shapes(mat_prod, in_check, out_check):
 
 
 # input/output checker
-shape_like_output = functools.partial(check_like, name="output")
+shape_like_output = functools.partial(check_like, name="_output")
 shape_like_input = functools.partial(check_like, name="input0")
 shape_like_weight = functools.partial(check_like, name="weight")
 shape_like_bias = functools.partial(check_like, name="bias")

@@ -43,7 +43,12 @@ class LinearDerivatives(BaseParameterDerivatives):
     def _weight_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
         """Apply transposed Jacobian of the output w.r.t. the weight."""
         d_weight = module.input0
-        contract = "vno,ni->voi" if sum_batch else "vno,ni->vnoi"
+
+        if len(d_weight.shape) == 3:
+            contract = "vnpo,npi->voi" if sum_batch else "vnpo,npi->vnoi"
+        else:
+            contract = "vno,ni->voi" if sum_batch else "vno,ni->vnoi"
+
         return einsum(contract, (mat, d_weight))
 
     def _bias_jac_mat_prod(self, module, g_inp, g_out, mat):
@@ -53,8 +58,16 @@ class LinearDerivatives(BaseParameterDerivatives):
 
     def _bias_jac_t_mat_prod(self, module, g_inp, g_out, mat, sum_batch=True):
         """Apply transposed Jacobian of the output w.r.t. the bias."""
-        if sum_batch:
-            N_axis = 1
-            return mat.sum(N_axis)
-        else:
-            return mat
+
+        if len(mat.shape) == 4: # dim = 3
+            if sum_batch:
+                N_axis = 1
+                return mat.sum(-2).sum(N_axis)
+            else:
+                return mat.sum(-2)
+        else: # dim = 2
+            if sum_batch:
+                N_axis = 1
+                return mat.sum(N_axis)
+            else:
+                return mat
